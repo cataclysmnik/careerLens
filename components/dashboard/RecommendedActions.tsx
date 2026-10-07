@@ -1,29 +1,26 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 
-export function RecommendedActions() {
+export function RecommendedActions({ actions }: { actions: { title: string; description: string; impact: string }[] }) {
   return (
     <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">
         Recommended Actions
       </h3>
-      <div className="space-y-3">
-        <ActionCard 
-          title="Add automated tests to two projects"
-          description="Implementing Jest or Vitest in your existing React projects will significantly boost your Engineering Practices score."
-          impact="High Impact"
-        />
-        <ActionCard 
-          title="Deploy one backend application"
-          description="Create a simple Node.js/Express API, containerize it with Docker, and deploy it to a platform like Render or AWS."
-          impact="High Impact"
-        />
-        <ActionCard 
-          title="Improve project documentation"
-          description="Update README.md files on your top 3 repositories to include setup instructions and architecture diagrams."
-          impact="Medium Impact"
-        />
-      </div>
+      {actions.length > 0 ? (
+        <div className="space-y-3">
+          {actions.map((act, idx) => (
+            <ActionCard 
+              key={idx}
+              title={act.title}
+              description={act.description}
+              impact={act.impact}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">Your profile looks great! No immediate actions recommended.</p>
+      )}
     </div>
   );
 }

@@ -17,8 +17,8 @@ export function parseResumeDeterministic(text: string): ParsedResume {
   // Deterministic extraction
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   
-  // Catch http(s) links, plus raw github.com and linkedin.com URLs
-  const linkRegex = /https?:\/\/[^\s]+|(?:www\.)?github\.com\/[^\s]+|(?:www\.)?linkedin\.com\/in\/[^\s]+/gi;
+  // Catch http(s) links, raw github/linkedin, AND standard custom domains (e.g., sagnik.dev, name.com)
+  const linkRegex = /https?:\/\/[^\s]+|(?:www\.)?github\.com\/[^\s]+|(?:www\.)?linkedin\.com\/in\/[^\s]+|[a-zA-Z0-9-]+\.(?:com|org|net|io|dev|me|co|app)\b(?:\/[^\s]*)?/gi;
   
   const emails = Array.from(new Set(text.match(emailRegex) || []));
   

@@ -14,6 +14,9 @@ export default async function ProfilePage() {
       <header className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Edit Profile</h1>
         <div className="flex items-center gap-4">
+          <Link href="/profile/portfolio" className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
+            Portfolio Analyzer
+          </Link>
           <Link href="/profile/github" className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
             GitHub Analyzer
           </Link>

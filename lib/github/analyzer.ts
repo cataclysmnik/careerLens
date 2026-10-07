@@ -42,9 +42,23 @@ export function analyzeGithubProfile(repos: GithubRepo[]): GithubSkillEvidence[]
     repo.topics.forEach(topic => repoSkills.add(topic));
 
     // Analyze infrastructure evidence
-    const hasDocker = repo.topics.includes('docker') || repo.name.includes('docker');
-    const hasTests = repo.topics.includes('jest') || repo.topics.includes('testing') || repo.name.includes('test');
-    const isDeployed = repo.topics.includes('vercel') || repo.topics.includes('aws') || repo.description?.toLowerCase().includes('deployed');
+    let hasDocker = repo.topics.includes('docker') || repo.name.includes('docker');
+    let hasTests = repo.topics.includes('jest') || repo.topics.includes('testing') || repo.name.includes('test');
+    let isDeployed = repo.topics.includes('vercel') || repo.topics.includes('aws') || repo.description?.toLowerCase().includes('deployed') || false;
+
+    // Hard evidence from root files
+    if (repo.rootFiles) {
+      const files = repo.rootFiles.map(f => f.toLowerCase());
+      if (files.includes('dockerfile') || files.includes('docker-compose.yml')) {
+        hasDocker = true;
+      }
+      if (files.some(f => f.includes('jest.config') || f.includes('cypress') || f.includes('pytest') || f.includes('mocha'))) {
+        hasTests = true;
+      }
+      if (files.includes('.github') || files.includes('vercel.json') || files.includes('netlify.toml')) {
+        isDeployed = true; // CI/CD or explicit hosting config
+      }
+    }
 
     repoSkills.forEach(skillStr => {
       // Normalize common skill names

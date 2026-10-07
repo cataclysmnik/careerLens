@@ -1,7 +1,13 @@
 import React from 'react';
 import { CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
 
-export function StrengthsAndGaps() {
+export function StrengthsAndGaps({ 
+  strengths, 
+  gaps 
+}: { 
+  strengths: { title: string; description: string }[];
+  gaps: { title: string; description: string }[];
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Strengths */}
@@ -10,20 +16,18 @@ export function StrengthsAndGaps() {
           <CheckCircle2 className="w-4 h-4 text-green-500" />
           Top Strengths
         </h3>
-        <ul className="space-y-4">
-          <li className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Strong React Experience</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Verified across 7 repositories and 4 deployed projects.</span>
-          </li>
-          <li className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Multiple Completed Projects</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Consistent project delivery over the past 12 months.</span>
-          </li>
-          <li className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Consistent GitHub Activity</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Frequent commits and PR reviews indicating active engagement.</span>
-          </li>
-        </ul>
+        {strengths.length > 0 ? (
+          <ul className="space-y-4">
+            {strengths.map((s, idx) => (
+              <li key={idx} className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{s.title}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{s.description}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">Add more evidence to identify strengths.</p>
+        )}
       </div>
 
       {/* Gaps */}
@@ -32,20 +36,18 @@ export function StrengthsAndGaps() {
           <AlertTriangle className="w-4 h-4 text-amber-500" />
           Biggest Gaps
         </h3>
-        <ul className="space-y-4">
-          <li className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Limited Testing Practices</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">No unit or integration tests detected in recent repositories.</span>
-          </li>
-          <li className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Weak Deployment Evidence</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Only static deployments found; lack of containerization/CI/CD.</span>
-          </li>
-          <li className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Few Production-Scale Projects</span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Projects lack complex architecture or database relationships.</span>
-          </li>
-        </ul>
+        {gaps.length > 0 ? (
+          <ul className="space-y-4">
+            {gaps.map((g, idx) => (
+              <li key={idx} className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{g.title}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">{g.description}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">No major gaps identified!</p>
+        )}
       </div>
     </div>
   );
