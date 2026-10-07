@@ -277,6 +277,31 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {isCurrentModel && scoring.separateMetrics && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[scoring.separateMetrics.academic, scoring.separateMetrics.problemSolving].map((m) => (
+              <div key={m.label} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{m.label}</p>
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Not in readiness</span>
+                </div>
+                <p className="text-2xl font-bold mb-1">{m.score ?? '—'}{m.score != null && <span className="text-sm font-normal text-gray-500"> / 100</span>}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{m.detail}</p>
+                {m.breakdown && (
+                  <ul className="mt-3 space-y-1">
+                    {m.breakdown.map((c) => (
+                      <li key={c.key} className="flex justify-between text-xs">
+                        <span className={c.normalized === null ? 'text-gray-400' : ''}>{c.label} <span className="text-gray-400">({c.raw})</span></span>
+                        <span className="tabular-nums text-gray-500">{c.normalized === null ? '—' : `${Math.round(c.normalized)} × ${Math.round(c.weight * 100)}%`}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {evidence?.inputs?.profile && (
           <div className="mb-6">
             <ExtractedProfile profile={evidence.inputs.profile} compact />
@@ -301,7 +326,12 @@ export default function DashboardPage() {
           </h3>
           {isCurrentModel && (
             <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2 mb-2">
-              Each score combines resume claims, projects, GitHub code, recency, consistency and portfolio evidence. Click a skill to see exactly how it was calculated.
+              Each score combines resume claims, projects, GitHub code, coding platforms, certificates, recency, consistency and portfolio evidence.
+              Skills with no external proof are marked <span className="font-semibold text-red-600">No proof</span> and count for less.
+              {scoring.skillScores.some((sk) => sk.proof) && (
+                <> {scoring.skillScores.filter((sk) => sk.proven).length} of {scoring.skillScores.length} skills are proven.</>
+              )}{' '}
+              Click a skill to see exactly how it was calculated.
             </p>
           )}
           {isCurrentModel ? (

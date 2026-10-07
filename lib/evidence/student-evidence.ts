@@ -14,6 +14,7 @@ import { CandidateExtractionSchema } from '@/lib/llm/schemas';
 import type { CandidateProfile } from '@/lib/profile/candidate';
 import { toGithubInput, type EvidenceInputs } from '@/lib/scoring/evidence-inputs';
 import { calculateReadiness, type ScoringResult } from '@/lib/scoring/engine';
+import { SCORING_VERSION } from '@/lib/scoring/config';
 import { skillLabel, canonicalizeSkill } from '@/lib/scoring/skill-taxonomy';
 
 /** The last GitHub analysis, kept so the GitHub Analyzer reopens with it. */
@@ -126,4 +127,22 @@ export function readInputs(evidence: unknown): EvidenceInputs | null {
   const inputs = (evidence as Partial<StoredEvidence> | null)?.inputs;
   if (!inputs?.profile || !inputs.asOf) return null;
   return inputs;
+}
+
+/**
+ * The report's scoring, recomputed from its stored inputs when it was produced
+ * by an older SCORING_VERSION. `changed` tells the caller to save it back.
+ */
+export function currentScoring(
+  evidence: unknown,
+  scoring: unknown,
+  targetRole: string | null
+): { scoring: ScoringResult | null; changed: boolean } {
+  const stored = scoring as Partial<ScoringResult> | null;
+  const inputs = readInputs(evidence);
+  if (!inputs || stored?.scoringVersion === SCORING_VERSION) {
+    return { scoring: (stored as ScoringResult | null) ?? null, changed: false };
+  }
+  // Keep the original asOf so recency is measured from when the evidence was collected.
+  return { scoring: calculateReadiness(inputs, { targetRole }), changed: true };
 }

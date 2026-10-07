@@ -41,7 +41,7 @@ type StudentRow = {
   categories: { title: string; score: number }[];
   strengths: { title: string; description: string }[];
   gaps: { title: string; description: string }[];
-  skills: { name: string; strength: string }[];
+  skills: { name: string; strength: string; proven: boolean | null; proof: string[] }[];
   hasGithub: boolean;
   hasPortfolio: boolean;
   updatedAt: string | null;
@@ -424,11 +424,21 @@ function StudentDetail({ s }: { s: StudentRow }) {
 
       {s.skills.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Verified Skills</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Skills &amp; Proof</h4>
           <div className="flex flex-wrap gap-1.5">
             {s.skills.map((sk) => (
-              <span key={sk.name} className="px-2 py-0.5 rounded-full bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-xs">
+              <span
+                key={sk.name}
+                title={sk.proof.length ? `Proof: ${sk.proof.join(', ')}` : sk.proven === false ? 'No GitHub, portfolio, coding platform or certificate shows this skill' : undefined}
+                className={`px-2 py-0.5 rounded-full border text-xs ${
+                  sk.proven === false
+                    ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-900/50'
+                    : 'bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700'
+                }`}
+              >
                 {sk.name} <span className="text-gray-400">· {sk.strength}</span>
+                {sk.proven === false && <span className="text-red-600 dark:text-red-400 font-semibold"> · no proof</span>}
+                {sk.proof.length > 0 && <span className="text-green-700 dark:text-green-400"> · {Array.from(new Set(sk.proof)).join(', ')}</span>}
               </span>
             ))}
           </div>

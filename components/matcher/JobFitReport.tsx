@@ -182,6 +182,17 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
                   </td>
                   <td className="py-2.5 pr-3">
                     {r.via === 'none' ? <span className="text-xs text-gray-400">No evidence</span> : <VerificationBadge level={r.verification} insufficient={r.insufficientEvidence} />}
+                    {r.via !== 'none' && r.proof && (
+                      <div className="mt-1 text-[11px]">
+                        {r.proof.length ? (
+                          <span className="text-green-700 dark:text-green-400" title={r.proof.map((p) => `${p.label}: ${p.detail}`).join('\n')}>
+                            Proof: {Array.from(new Set(r.proof.map((p) => p.label))).join(', ')}
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-red-600 dark:text-red-400">No proof</span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2.5 text-right tabular-nums">{r.gap > 0 ? Math.round(r.gap) : <CheckCircle2 className="w-4 h-4 text-green-500 inline" />}</td>
                   <td className="py-2.5 text-right tabular-nums font-semibold">{r.priority > 0 ? Math.round(r.priority) : '—'}</td>

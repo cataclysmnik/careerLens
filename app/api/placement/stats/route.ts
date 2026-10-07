@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import type { ScoringResult } from "@/lib/scoring/engine";
 import type { UnifiedEvidence } from "@/lib/evidence/aggregator";
 import { readinessTier, TIER_ORDER, type ReadinessTier } from "@/lib/readiness";
+import { currentScoring } from "@/lib/evidence/student-evidence";
 
 export async function GET() {
   const session = await auth();
@@ -28,7 +29,8 @@ export async function GET() {
   const analyzed = students
     .filter((s) => s.evidence)
     .map((s) => {
-      const scoring = s.evidence!.scoring as unknown as ScoringResult;
+      // Stale reports are re-scored in memory (the students endpoint saves them).
+      const scoring = currentScoring(s.evidence!.evidence, s.evidence!.scoring, s.profile?.targetRole ?? null).scoring as unknown as ScoringResult;
       const evidence = s.evidence!.evidence as unknown as UnifiedEvidence;
       return { id: s.id, name: s.name, email: s.email, scoring, evidence, updatedAt: s.evidence!.updatedAt };
     });
