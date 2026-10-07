@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   CheckCircle2, XCircle, HelpCircle, AlertTriangle, Sparkles,
-  ListChecks, PlusCircle, GraduationCap, Briefcase, FolderGit2, Info, Globe, ExternalLink,
+  ListChecks, PlusCircle, GraduationCap, Briefcase, FolderGit2, Info, Globe, ExternalLink, GitFork,
 } from 'lucide-react';
 import type { JobFitResult } from '@/lib/scoring/jobMatch';
 import { VERDICT_LABEL, type FitVerdict } from '@/lib/scoring/verdict';
@@ -219,49 +219,78 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
           Scores come from your evidence, never from the AI. The black tick marks the target score.
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[540px]">
             <thead>
               <tr className="text-left text-xs text-gray-400">
                 <th className="font-medium pb-2">Skill</th>
                 <th className="font-medium pb-2">Importance</th>
                 <th className="font-medium pb-2 w-48">Score vs target</th>
                 <th className="font-medium pb-2">Evidence</th>
-                <th className="font-medium pb-2 text-right">Gap</th>
-                <th className="font-medium pb-2 text-right">Priority</th>
               </tr>
             </thead>
             <tbody>
-              {result.requirements.map((r) => (
-                <tr key={r.label} className="border-t border-gray-100 dark:border-zinc-800 align-top">
-                  <td className="py-2.5 pr-3">
-                    <div className="font-medium" title={r.quote || undefined}>{r.label}</div>
-                    <div className="text-[11px] text-gray-400">
-                      {r.requirement === 'preferred' ? 'Preferred' : 'Required'}
-                      {r.matchedSkill && ` · counted: ${r.matchedSkill}`}
-                      {r.via === 'implied' && ` · implied by ${r.viaSkill}`}
-                      {!r.claimed && r.via === 'none' && ' · not on resume'}
-                    </div>
-                    {result.research?.method === 'job_postings' && r.quote && !r.alternatives?.length && (
-                      <div className="text-[11px] text-gray-400">{r.quote.replace(/^In /, 'in ')}</div>
-                    )}
-                    {r.alternatives && r.alternatives.length > 0 && (
-                      <div className="text-[11px] text-gray-400">any one of these is enough</div>
-                    )}
-                  </td>
-                  <td className="py-2.5 pr-3"><Importance value={r.importance} /></td>
-                  <td className="py-2.5 pr-3">
-                    <div className="flex items-center gap-2">
-                      <span className="tabular-nums font-semibold w-7">{Math.round(r.score)}</span>
-                      <div className="flex-1"><ScoreBar score={r.score} target={r.target} /></div>
-                    </div>
-                  </td>
-                  <td className="py-2.5 pr-3">
-                    {r.via === 'none' ? <span className="text-xs text-gray-400">No evidence</span> : <VerificationBadge level={r.verification} insufficient={r.insufficientEvidence} />}
-                  </td>
-                  <td className="py-2.5 text-right tabular-nums">{r.gap > 0 ? Math.round(r.gap) : <CheckCircle2 className="w-4 h-4 text-green-500 inline" />}</td>
-                  <td className="py-2.5 text-right tabular-nums font-semibold">{r.priority > 0 ? Math.round(r.priority) : '—'}</td>
-                </tr>
-              ))}
+              {result.requirements.map((r) => {
+                const matchingSkills = (result.skillScores ?? []).filter(
+                  (s) => s.id === r.id || (r.alternatives && r.alternatives.includes(s.id))
+                );
+                const matched = matchingSkills.find((s) => s.evidence?.repos?.length > 0) ?? matchingSkills[0];
+                const repos = matched?.evidence?.repos ?? [];
+                const hasGithub = repos.length > 0;
+
+                return (
+                  <tr key={r.label} className="border-t border-gray-100 dark:border-zinc-800 align-top">
+                    <td className="py-2.5 pr-3">
+                      <div className="font-medium" title={r.quote || undefined}>{r.label}</div>
+                      <div className="text-[11px] text-gray-400">
+                        {r.requirement === 'preferred' ? 'Preferred' : 'Required'}
+                        {r.matchedSkill && ` · counted: ${r.matchedSkill}`}
+                        {r.via === 'implied' && ` · implied by ${r.viaSkill}`}
+                        {!r.claimed && r.via === 'none' && ' · not on resume'}
+                      </div>
+                      {result.research?.method === 'job_postings' && r.quote && !r.alternatives?.length && (
+                        <div className="text-[11px] text-gray-400">{r.quote.replace(/^In /, 'in ')}</div>
+                      )}
+                      {r.alternatives && r.alternatives.length > 0 && (
+                        <div className="text-[11px] text-gray-400">any one of these is enough</div>
+                      )}
+                    </td>
+                    <td className="py-2.5 pr-3"><Importance value={r.importance} /></td>
+                    <td className="py-2.5 pr-3">
+                      <div className="flex items-center gap-2">
+                        <span className="tabular-nums font-semibold w-7">{Math.round(r.score)}</span>
+                        <div className="flex-1"><ScoreBar score={r.score} target={r.target} /></div>
+                      </div>
+                    </td>
+                    <td className="py-2.5 pr-3">
+                      {hasGithub ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <VerificationBadge level={r.verification} insufficient={r.insufficientEvidence} />
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
+                              <GitFork className="w-3 h-3" /> Found in GitHub ({repos.length} {repos.length === 1 ? 'repo' : 'repos'})
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-xs" title={repos.join(', ')}>
+                            {repos.slice(0, 3).join(', ')}{repos.length > 3 ? ` +${repos.length - 3} more` : ''}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {r.via !== 'none' && <VerificationBadge level={r.verification} insufficient={r.insufficientEvidence} />}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-800/80 border border-gray-200 dark:border-zinc-700">
+                              Not found in GitHub
+                            </span>
+                          </div>
+                          {r.claimed && r.via === 'none' && (
+                            <p className="text-[11px] text-amber-600 dark:text-amber-400">Claimed on resume only</p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
