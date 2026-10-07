@@ -124,7 +124,7 @@ export function extractAllProjects(stored: StoredEvidence | null): InterviewProj
   const projects: InterviewProject[] = [];
   const seenTitles = new Set<string>();
 
-  // 1. Resume projects
+  // Extract strictly from the uploaded resume profile
   if (stored?.inputs?.profile?.projects) {
     for (const p of stored.inputs.profile.projects) {
       if (!p.name || seenTitles.has(p.name.toLowerCase())) continue;
@@ -132,7 +132,7 @@ export function extractAllProjects(stored: StoredEvidence | null): InterviewProj
       projects.push({
         id: `resume-${p.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
         title: p.name,
-        description: p.description || 'Software engineering project.',
+        description: p.description || 'Software engineering project from resume.',
         skills: p.skills || [],
         components: p.components || [],
         architecturePatterns: p.architecturePatterns || [],
@@ -146,39 +146,6 @@ export function extractAllProjects(stored: StoredEvidence | null): InterviewProj
         ].filter(Boolean) as string[],
       });
     }
-  }
-
-  // 2. GitHub repositories
-  const githubRepos = stored?.githubSnapshot?.repositories || stored?.inputs?.github?.repositories || [];
-  for (const repo of githubRepos) {
-    if (!repo.name || seenTitles.has(repo.name.toLowerCase())) continue;
-    seenTitles.add(repo.name.toLowerCase());
-    projects.push({
-      id: `gh-${repo.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-      title: repo.name,
-      description: repo.description || `Repository built with ${repo.language || 'modern technologies'}.`,
-      skills: repo.language ? [repo.language, ...(repo.topics || [])] : (repo.topics || []),
-      components: ['Repository Codebase', ...(repo.rootFiles || []).slice(0, 3)],
-      architecturePatterns: [],
-      source: 'github',
-      liveUrl: repo.homepage || null,
-      repoUrl: `https://github.com/${stored?.githubSnapshot?.username || 'repo'}/${repo.name}`,
-      highlights: repo.language ? [`Built with ${repo.language}`] : [],
-    });
-  }
-
-  // 3. Fallback default project if candidate has not uploaded a resume yet
-  if (projects.length === 0) {
-    projects.push({
-      id: 'demo-fullstack-app',
-      title: 'Full-Stack Web Platform',
-      description: 'Distributed web application with authentication, REST API endpoints, relational database, and responsive frontend.',
-      skills: ['TypeScript', 'React', 'Node.js', 'PostgreSQL', 'Docker'],
-      components: ['Frontend UI', 'REST Backend', 'PostgreSQL DB', 'JWT Auth'],
-      architecturePatterns: ['REST API', 'Client-Server Architecture'],
-      source: 'resume',
-      highlights: ['Full-stack CRUD workflows', 'Relational database schema'],
-    });
   }
 
   return projects;

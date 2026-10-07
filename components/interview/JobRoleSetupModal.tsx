@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Briefcase,
   Layers,
@@ -12,6 +13,7 @@ import {
   CheckCircle2,
   FolderGit2,
   Globe,
+  FileText,
   ArrowRight,
   Loader2,
   Search,
@@ -206,41 +208,55 @@ export function JobRoleSetupModal({
 
           {/* Matched Relevant Projects */}
           <div className="space-y-2">
-            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 block">
-              Relevant Projects Fetched from Your Background ({topRelevantProjects.length}):
-            </span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {topRelevantProjects.map((proj) => (
-                <div
-                  key={proj.id}
-                  className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/40 shadow-xs space-y-1.5"
-                >
-                  <div className="flex items-center gap-2">
-                    {proj.source === 'github' ? (
-                      <FolderGit2 className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
-                    ) : (
-                      <Globe className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                    )}
-                    <span className="font-semibold text-xs text-gray-900 dark:text-white line-clamp-1">
-                      {proj.title}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1">
-                    {proj.description}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {proj.skills.slice(0, 3).map((s) => (
-                      <span
-                        key={s}
-                        className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300"
-                      >
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 block">
+                Projects Fetched from Your Uploaded Resume ({topRelevantProjects.length}):
+              </span>
+              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                Strictly from parsed resume
+              </span>
             </div>
+
+            {topRelevantProjects.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {topRelevantProjects.map((proj) => (
+                  <div
+                    key={proj.id}
+                    className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-blue-100 dark:border-blue-900/40 shadow-xs space-y-1.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                      <span className="font-semibold text-xs text-gray-900 dark:text-white line-clamp-1">
+                        {proj.title}
+                      </span>
+                      <span className="ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex-shrink-0">
+                        Resume Project
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2">
+                      {proj.description}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {proj.skills.slice(0, 4).map((s) => (
+                        <span
+                          key={s}
+                          className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+                <span>No projects detected on your uploaded resume yet.</span>
+                <Link href="/profile/resume" className="font-bold underline text-amber-900 dark:text-amber-200 ml-2">
+                  Upload Resume in Parser &rarr;
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Expected Technical Topics Covered */}
