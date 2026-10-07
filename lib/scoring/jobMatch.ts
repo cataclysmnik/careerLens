@@ -1,96 +1,187 @@
-import { UnifiedSkill } from "@/lib/evidence/aggregator";
+// lib/scoring/jobMatch.ts
+//
+// Resume × job description cross-validation:
+//   1. LLM interprets the JD   -> weighted skill requirements + eligibility
+//   2. Engine measures/calculates -> role fit, gaps, priority, eligibility, verdict
+//   3. LLM explains             -> narrative grounded in the numbers from step 2
+// The verdict and every number come from step 2 only.
 
-const techDictionary = [
-  'JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Ruby', 'Go', 'Golang', 'Rust', 'PHP', 'Swift', 'Kotlin', 'R', 'Scala', 'Dart', 'HTML', 'CSS', 'Bash', 'Shell',
-  'React', 'React.js', 'Next.js', 'Vue', 'Vue.js', 'Nuxt.js', 'Angular', 'Svelte', 'Redux', 'Tailwind', 'Tailwind CSS', 'Sass', 'LESS', 'Material UI', 'Bootstrap', 'Webpack', 'Vite',
-  'Node.js', 'Node', 'Express', 'Express.js', 'NestJS', 'Django', 'Flask', 'FastAPI', 'Spring Boot', 'Ruby on Rails', 'ASP.NET', 'Laravel', 'GraphQL', 'REST API', 'Apollo',
-  'SQL', 'MySQL', 'PostgreSQL', 'Postgres', 'MongoDB', 'Mongo', 'Redis', 'Elasticsearch', 'Cassandra', 'DynamoDB', 'SQLite', 'MariaDB', 'Supabase', 'Firebase', 'Prisma', 'TypeORM',
-  'AWS', 'Amazon Web Services', 'Azure', 'GCP', 'Google Cloud', 'Docker', 'Kubernetes', 'K8s', 'Terraform', 'Ansible', 'Jenkins', 'GitHub Actions', 'GitLab CI', 'CircleCI', 'Linux', 'Nginx',
-  'Machine Learning', 'Deep Learning', 'PyTorch', 'TensorFlow', 'Keras', 'Scikit-learn', 'Pandas', 'NumPy', 'Computer Vision', 'NLP', 'OpenAI', 'LLM',
-  'Git', 'Jira', 'Agile', 'Scrum', 'Figma', 'Jest', 'Cypress', 'Mocha', 'Selenium', 'CI/CD', 'Microservices', 'System Design'
-];
+import { extractJobRequirements } from '@/lib/llm/extract-jd';
+import { generateFitAssessment } from '@/lib/llm/cross-validate';
+import type { FitAssessment, JobRequirements } from '@/lib/llm/schemas';
+import { canonicalizeSkill } from './skill-taxonomy';
+import { computeRoleFit, recommendActions, type NextAction, type RequirementResult, type RoleFitResult } from './role-fit';
+import { calculateReadiness, computeSkillProfile, type ScoringResult } from './engine';
+import { checkEligibility, type EligibilityResult } from './eligibility';
+import { CRITICAL_GAP_LIMIT, FIT_VERDICT_THRESHOLDS, SCORING_VERSION } from './config';
+import type { EvidenceInputs } from './evidence-inputs';
+import type { SkillScore } from './skill-score';
+import type { FitVerdict } from './verdict';
 
-export type JobMatchResult = {
-  matchScore: number;
-  matchedSkills: { name: string; strength: string; confidenceScore: number }[];
-  missingSkills: string[];
-  bonusSkills: string[];
-  feedback: string;
+export { VERDICT_LABEL, type FitVerdict } from './verdict';
+
+export type JobFitResult = {
+  scoringVersion: string;
+  job: { title: string | null; company: string | null; seniority: JobRequirements['seniority']; responsibilities: string[] };
+  roleFit: number;
+  exactRoleFit: number;
+  formula: { numerator: number; denominator: number };
+  verdict: FitVerdict;
+  verdictReason: string;
+  eligibility: EligibilityResult;
+  requirements: RequirementResult[];
+  gaps: RequirementResult[];
+  nextActions: NextAction[];
+  bonusSkills: { id: string; label: string; score: number }[];
+  coverage: { required: number; requiredMet: number; preferred: number; preferredMet: number };
+  /** Overall readiness with this JD as the role-alignment dimension (§17). */
+  readinessForRole: Pick<ScoringResult, 'overallScore' | 'dimensions' | 'confidence'>;
+  academics: ScoringResult['academics'];
+  experience: ScoringResult['experience'];
+  projectNames: string[];
+  skillScores: SkillScore[];
+  assessment: FitAssessment | null;
+  ai: {
+    enabled: boolean;
+    jdParsedBy: 'llm' | 'keywords';
+    assessment: 'llm' | 'unavailable';
+    profileSource: 'llm' | 'fallback';
+    errors: string[];
+  };
 };
 
-export function extractRequiredSkills(jobDescription: string): string[] {
-  const requiredSkills = new Set<string>();
-  const text = jobDescription.toLowerCase();
+/** One uploaded resume in the company bulk matcher. */
+export type CompanyMatchRow =
+  | { fileName: string; candidateName: string | null; result: JobFitResult }
+  | { fileName: string; error: string };
 
-  techDictionary.forEach(skill => {
-    let searchPattern = skill;
-    if (skill.toLowerCase() === 'node' || skill.toLowerCase() === 'node.js') searchPattern = 'Node\\.?js|Node';
-    else if (skill.toLowerCase() === 'react' || skill.toLowerCase() === 'react.js') searchPattern = 'React\\.?js|React';
-    else if (skill.toLowerCase() === 'vue' || skill.toLowerCase() === 'vue.js') searchPattern = 'Vue\\.?js|Vue';
-    else searchPattern = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+type Req = { id: string; label: string; alternatives: string[]; importance: 1 | 2 | 3 | 4 | 5; requirement: 'required' | 'preferred'; quote: string };
 
-    const regex = new RegExp(`\\b(${searchPattern})\\b`, 'i');
-    if (regex.test(text)) {
-      if (skill.toLowerCase() === 'node') requiredSkills.add('Node.js');
-      else if (skill.toLowerCase() === 'react') requiredSkills.add('React');
-      else if (skill.toLowerCase() === 'vue') requiredSkills.add('Vue');
-      else if (skill.toLowerCase() === 'postgres') requiredSkills.add('PostgreSQL');
-      else if (skill.toLowerCase() === 'golang') requiredSkills.add('Go');
-      else requiredSkills.add(skill);
+function toRoleRequirements(req: JobRequirements): Req[] {
+  // Collapse "X or Y" groups into one requirement, and merge duplicates that
+  // canonicalize to the same skill, keeping the highest importance.
+  const byKey = new Map<string, Req>();
+  for (const s of req.skills) {
+    const c = canonicalizeSkill(s.name);
+    const importance = Math.min(5, Math.max(1, s.importance)) as Req['importance'];
+    const label = c.known ? c.label : s.name;
+    const key = s.anyOfGroup ? `group:${s.anyOfGroup.toLowerCase()}` : c.id;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, { id: c.id, label, alternatives: [], importance, requirement: s.requirement, quote: s.quote });
+    } else if (s.anyOfGroup) {
+      if (prev.id !== c.id && !prev.alternatives.includes(c.id)) {
+        prev.alternatives.push(c.id);
+        prev.label = `${prev.label} / ${label}`;
+      }
+      prev.importance = Math.max(prev.importance, importance) as Req['importance'];
+    } else if (importance > prev.importance) {
+      byKey.set(key, { ...prev, importance, requirement: s.requirement, quote: s.quote });
     }
-  });
-
-  return Array.from(requiredSkills);
+  }
+  return Array.from(byKey.values()).sort((a, b) => b.importance - a.importance);
 }
 
-export function matchEvidenceAgainstJD(jobDescription: string, evidenceSkills: UnifiedSkill[]): JobMatchResult {
-  const requiredArray = extractRequiredSkills(jobDescription);
+function decideVerdict(fit: RoleFitResult, eligibility: EligibilityResult): { verdict: FitVerdict; reason: string } {
+  const failed = eligibility.checks.filter((c) => c.status === 'fail');
+  if (failed.length > 0) {
+    return { verdict: 'not_eligible', reason: `Does not meet: ${failed.map((c) => `${c.label} (${c.required}, has ${c.actual})`).join('; ')}.` };
+  }
+  if (fit.requirements.length === 0) {
+    return { verdict: 'not_a_fit', reason: 'No technical requirements could be identified in this job description.' };
+  }
+  const critical = fit.gaps.filter((g) => g.importance === 5 && g.gap > CRITICAL_GAP_LIMIT);
+  const f = fit.exactFit;
+  let verdict: FitVerdict = f >= FIT_VERDICT_THRESHOLDS.strong ? 'strong_fit' : f >= FIT_VERDICT_THRESHOLDS.good ? 'good_fit' : f >= FIT_VERDICT_THRESHOLDS.stretch ? 'stretch' : 'not_a_fit';
+  let reason = `Role fit ${Math.round(f)}/100 (strong ≥ ${FIT_VERDICT_THRESHOLDS.strong}, good ≥ ${FIT_VERDICT_THRESHOLDS.good}, stretch ≥ ${FIT_VERDICT_THRESHOLDS.stretch}).`;
+  if (critical.length > 0 && (verdict === 'strong_fit' || verdict === 'good_fit')) {
+    verdict = 'stretch';
+    reason += ` Capped at Stretch: must-have ${critical.map((g) => g.label).join(', ')} ${critical.length > 1 ? 'are' : 'is'} more than ${CRITICAL_GAP_LIMIT} points below target.`;
+  }
+  return { verdict, reason };
+}
 
-  if (requiredArray.length === 0) {
-    return {
-      matchScore: 0,
-      matchedSkills: [],
-      missingSkills: [],
-      bonusSkills: [],
-      feedback: "We couldn't detect any specific technical skills in this job description. Try pasting a more detailed technical JD."
-    };
+export async function analyzeJobFit(
+  inputs: EvidenceInputs,
+  jobDescription: string,
+  opts: { explain?: boolean } = {}
+): Promise<JobFitResult> {
+  const explain = opts.explain ?? true;
+  const errors: string[] = [];
+
+  // 1. Interpret the JD.
+  const jd = await extractJobRequirements(jobDescription);
+  if (jd.ai.error) errors.push(`JD parsing: ${jd.ai.error}`);
+  const reqs = toRoleRequirements(jd.requirements);
+
+  // 2. Measure + calculate.
+  const sp = computeSkillProfile(inputs);
+  const fit = computeRoleFit(reqs, sp.scoreMap);
+  const readiness = calculateReadiness(inputs, {
+    skillProfile: sp,
+    roleOverride: { title: jd.requirements.title ?? 'this role', fit },
+  });
+  const eligibility = checkEligibility(jd.requirements.eligibility, readiness.academics, readiness.experience, inputs.profile.activeBacklogs);
+  const { verdict, reason } = decideVerdict(fit, eligibility);
+  const nextActions = recommendActions(fit.gaps, sp.scoreMap, fit.denominator);
+
+  const reqIds = new Set(reqs.flatMap((r) => [r.id, ...r.alternatives]));
+  const bonusSkills = sp.skills
+    .filter((s) => !reqIds.has(s.id) && s.score > 60)
+    .slice(0, 8)
+    .map((s) => ({ id: s.id, label: s.label, score: s.score }));
+
+  const required = fit.requirements.filter((r) => r.requirement === 'required');
+  const preferred = fit.requirements.filter((r) => r.requirement === 'preferred');
+
+  const result: JobFitResult = {
+    scoringVersion: SCORING_VERSION,
+    job: {
+      title: jd.requirements.title,
+      company: jd.requirements.company,
+      seniority: jd.requirements.seniority,
+      responsibilities: jd.requirements.responsibilities,
+    },
+    roleFit: fit.fit,
+    exactRoleFit: fit.exactFit,
+    formula: { numerator: fit.numerator, denominator: fit.denominator },
+    verdict,
+    verdictReason: reason,
+    eligibility,
+    requirements: fit.requirements,
+    gaps: fit.gaps,
+    nextActions,
+    bonusSkills,
+    coverage: {
+      required: required.length,
+      requiredMet: required.filter((r) => r.gap === 0).length,
+      preferred: preferred.length,
+      preferredMet: preferred.filter((r) => r.gap === 0).length,
+    },
+    readinessForRole: { overallScore: readiness.overallScore, dimensions: readiness.dimensions, confidence: readiness.confidence },
+    academics: readiness.academics,
+    experience: readiness.experience,
+    projectNames: inputs.profile.projects.map((p) => p.name),
+    skillScores: sp.skills,
+    assessment: null,
+    ai: {
+      enabled: jd.ai.enabled,
+      jdParsedBy: jd.ai.used ? 'llm' : 'keywords',
+      assessment: 'unavailable',
+      profileSource: inputs.profile.source,
+      errors,
+    },
+  };
+
+  // 3. Explain. Runs after every number is fixed; its output can't change them.
+  if (explain && jd.ai.enabled) {
+    try {
+      result.assessment = await generateFitAssessment(inputs.profile, jobDescription, result);
+      result.ai.assessment = 'llm';
+    } catch (e) {
+      errors.push(`Assessment: ${e instanceof Error ? e.message : 'failed'}`);
+    }
   }
 
-  const matchedSkills: { name: string, strength: string, confidenceScore: number }[] = [];
-  const missingSkills: string[] = [];
-
-  requiredArray.forEach(reqSkill => {
-    const found = evidenceSkills.find(s => s.name.toLowerCase() === reqSkill.toLowerCase());
-    if (found) {
-      matchedSkills.push({
-        name: found.name,
-        strength: found.strength,
-        confidenceScore: found.confidenceScore
-      });
-    } else {
-      missingSkills.push(reqSkill);
-    }
-  });
-
-  const bonusSkills = evidenceSkills
-    .filter(s => !requiredArray.some(req => req.toLowerCase() === s.name.toLowerCase()))
-    .filter(s => s.strength === 'Strong' || s.strength === 'Moderate')
-    .map(s => s.name);
-
-  let matchScore = (matchedSkills.length / requiredArray.length) * 70;
-
-  let strengthBonus = 0;
-  matchedSkills.forEach(skill => {
-    if (skill.strength === 'Strong') strengthBonus += (30 / requiredArray.length);
-    else if (skill.strength === 'Moderate') strengthBonus += (15 / requiredArray.length);
-  });
-
-  matchScore = Math.min(100, Math.round(matchScore + strengthBonus));
-
-  let feedback = `You meet ${matchedSkills.length} out of ${requiredArray.length} technical requirements. `;
-  if (matchScore >= 80) feedback += "You are a highly competitive candidate for this role!";
-  else if (matchScore >= 60) feedback += "You are a strong match, but you may need to brush up on a few missing skills.";
-  else feedback += "This role requires significant upskilling in several areas you haven't demonstrated yet.";
-
-  return { matchScore, matchedSkills, missingSkills, bonusSkills, feedback };
+  return result;
 }

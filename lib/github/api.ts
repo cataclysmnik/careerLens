@@ -6,6 +6,10 @@ export type GithubRepo = {
   language: string | null;
   stargazers_count: number;
   updated_at: string;
+  created_at?: string;
+  pushed_at?: string;
+  fork?: boolean;
+  homepage?: string | null;
   topics: string[];
   has_issues: boolean;
   default_branch: string;

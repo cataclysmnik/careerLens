@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { extractTextFromFile } from '@/lib/evidence/parsers/text-extractor';
 import { parseResumeDeterministic } from '@/lib/evidence/parsers/resume-parser';
+import { extractCandidateProfile } from '@/lib/llm/extract-resume';
+import { auth } from '@/lib/auth';
+import { syncProfileFromResume, type ProfileSyncResult } from '@/lib/profile/sync-from-resume';
+
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     const validMimeTypes = [
-      'application/pdf', 
+      'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain'
     ];
@@ -24,23 +29,35 @@ export async function POST(req: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Busting Turbopack cache for Phase 3 fix
     const extractedText = await extractTextFromFile(buffer, file.type);
 
     if (!extractedText || extractedText.trim().length === 0) {
       return NextResponse.json({ error: 'Could not extract text from file' }, { status: 400 });
     }
 
-    // 2. Parsing (Deterministic + AI)
+    // 1. Deterministic pass: links, emails, dictionary skills.
     const parsedData = parseResumeDeterministic(extractedText);
 
-    // Normally we would save this to the database and generate "Evidence Candidates" here
-    // For Phase 3, we return it to the UI for user correction
+    // 2. LLM pass over the full text: education, CGPA, 10th/12th marks,
+    //    experience, projects. Falls back to the deterministic pass without a key.
+    const { profile, ai } = await extractCandidateProfile(extractedText, parsedData);
 
-    return NextResponse.json({ success: true, data: parsedData }, { status: 200 });
+    // 3. Copy what the resume states into the student's "My Profile".
+    let profileSync: ProfileSyncResult | null = null;
+    const session = await auth();
+    if (session?.user?.id && session.user.role === 'STUDENT') {
+      try {
+        profileSync = await syncProfileFromResume(session.user.id, profile);
+      } catch (e) {
+        console.error('Failed to update profile from resume:', e);
+      }
+    }
 
-  } catch (error: any) {
+    return NextResponse.json({ success: true, data: parsedData, profile, ai, profileSync }, { status: 200 });
+
+  } catch (error: unknown) {
     console.error('Resume parsing error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to process resume' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to process resume';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

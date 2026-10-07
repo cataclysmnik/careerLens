@@ -1,14 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, FileText, GitFork, Globe, User, Briefcase, Trophy } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { SidebarUserCard } from './SidebarUserCard';
 
+const RESUME_HREF = '/profile/resume';
+
 const navItems = [
-  { name: 'Upload & Analyze', href: '/onboarding', icon: FileText },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Job Matcher', href: '/matcher', icon: Briefcase },
   { name: 'My Profile', href: '/profile', icon: User },
@@ -20,6 +21,18 @@ const navItems = [
 
 export function StudentSidebar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // Until the first resume analysis is saved, only the Resume Parser is shown.
+  const [hasAnalysis, setHasAnalysis] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (hasAnalysis) return;
+    fetch('/api/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => setHasAnalysis(!!json?.data?.hasAnalysis))
+      .catch(() => {});
+  }, [pathname, hasAnalysis]);
+
+  const visibleItems = hasAnalysis ? navItems : navItems.filter((item) => item.href === RESUME_HREF);
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-black font-sans text-gray-900 dark:text-gray-100 overflow-hidden">
@@ -33,7 +46,7 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
@@ -50,6 +63,11 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {hasAnalysis === false && (
+            <p className="px-3 pt-3 text-xs text-gray-500 dark:text-gray-400">
+              Upload and confirm your resume to unlock your dashboard, job matcher and profile tools.
+            </p>
+          )}
         </nav>
 
         <SidebarUserCard profileHref="/profile" />

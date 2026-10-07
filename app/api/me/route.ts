@@ -12,6 +12,7 @@ const USER_SELECT = {
   status: true,
   createdAt: true,
   password: true,
+  evidence: { select: { id: true } },
   profile: {
     select: {
       targetRole: true,
@@ -37,8 +38,9 @@ const USER_SELECT = {
 async function loadMe(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: USER_SELECT })
   if (!user) return null
-  const { password, ...rest } = user
-  return { ...rest, hasPassword: !!password }
+  const { password, evidence, ...rest } = user
+  // Students unlock the rest of the app once their first analysis is saved.
+  return { ...rest, hasPassword: !!password, hasAnalysis: !!evidence }
 }
 
 export async function GET() {

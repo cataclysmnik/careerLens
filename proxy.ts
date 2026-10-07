@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/prisma";
 
 // Proxy (formerly middleware) always runs on the Node.js runtime in this
 // Next.js version, so it can safely share lib/auth.ts, which depends on
@@ -20,7 +21,11 @@ const ROLE_HOME: Record<string, string> = {
   PLACEMENT_CELL: "/placement",
 };
 
-export default auth((req) => {
+// Students start on the Resume Parser; every other student page unlocks once
+// their first analysis (StudentEvidence row) is saved.
+const RESUME_PATH = "/profile/resume";
+
+export default auth(async (req) => {
   const { pathname } = req.nextUrl;
 
   if (
@@ -70,6 +75,25 @@ export default auth((req) => {
     (isPlacementArea && role !== "PLACEMENT_CELL")
   ) {
     return NextResponse.redirect(new URL(home, req.nextUrl));
+  }
+
+  // The old onboarding page was folded into the Resume Parser.
+  if (pathname.startsWith("/onboarding")) {
+    return NextResponse.redirect(new URL(RESUME_PATH, req.nextUrl));
+  }
+
+  // Once set up, a cookie skips the database check on later navigations. It
+  // only controls this redirect; the APIs never trust it.
+  const setupCookie = `cl_setup_${req.auth.user.id}`;
+  if (isStudentArea && role === "STUDENT" && !pathname.startsWith(RESUME_PATH) && !req.cookies.has(setupCookie)) {
+    const evidence = await prisma.studentEvidence.findUnique({
+      where: { userId: req.auth.user.id },
+      select: { id: true },
+    });
+    if (!evidence) return NextResponse.redirect(new URL(RESUME_PATH, req.nextUrl));
+    const res = NextResponse.next();
+    res.cookies.set(setupCookie, "1", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+    return res;
   }
 
   return NextResponse.next();

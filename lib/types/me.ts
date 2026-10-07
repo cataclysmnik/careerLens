@@ -28,5 +28,7 @@ export type Me = {
   status: AccountStatus
   createdAt: string
   hasPassword: boolean
+  /** A readiness analysis is saved (students only). */
+  hasAnalysis: boolean
   profile: MeProfile | null
 }

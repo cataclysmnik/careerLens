@@ -12,11 +12,11 @@ export default function Home() {
             <span className="font-bold text-xl tracking-tight">CareerLens</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/onboarding" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
+            <Link href="/login" className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
               Sign In
             </Link>
             <Link 
-              href="/onboarding" 
+              href="/register" 
               className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black text-sm font-semibold rounded-full hover:scale-105 active:scale-95 transition-all shadow-md"
             >
               Get Started Free
@@ -46,7 +46,7 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-300">
             <Link 
-              href="/onboarding" 
+              href="/register" 
               className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-bold rounded-full hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/25 active:scale-95 transition-all w-full sm:w-auto justify-center group"
             >
               Analyze Your Profile

@@ -78,22 +78,9 @@ export function parseResumeDeterministic(text: string): ParsedResume {
 
   const finalSkills = Array.from(detectedSkills);
 
-  // Mock AI Semantic Extraction for the Phase 3 requirement
-  // "Use deterministic extraction where practical and AI for ambiguous semantic extraction"
-  const aiDetectedClaims: { skill: string; context: string; confidence: 'High' | 'Medium' | 'Low' }[] = finalSkills.map(skill => ({
-    skill,
-    context: `Detected context suggesting experience with ${skill} in a professional setting.`,
-    confidence: 'High',
-  }));
-
-  // Add some mock ambiguous claims that an AI might find
-  if (text.toLowerCase().includes('lead') || text.toLowerCase().includes('manage')) {
-    aiDetectedClaims.push({
-      skill: 'Leadership',
-      context: 'Semantic analysis suggests leadership or management experience based on action verbs.',
-      confidence: 'Medium',
-    });
-  }
+  // Semantic extraction (experience, projects, academics) is done by the LLM in
+  // lib/llm/extract-resume.ts; this deterministic pass makes no AI claims.
+  const aiDetectedClaims: ParsedResume['aiDetectedClaims'] = [];
 
   return {
     skills: finalSkills,

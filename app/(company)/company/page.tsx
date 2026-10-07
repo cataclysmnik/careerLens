@@ -1,24 +1,18 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Briefcase, Target, AlertTriangle, CheckCircle2, Loader2, PlusCircle, UploadCloud, FileText, X } from 'lucide-react';
-
-type MatchResult = {
-  fileName: string;
-  matchScore?: number;
-  matchedSkills?: { name: string; strength: string; confidenceScore: number }[];
-  missingSkills?: string[];
-  bonusSkills?: string[];
-  feedback?: string;
-  error?: string;
-};
+import { Briefcase, Target, AlertTriangle, Loader2, UploadCloud, FileText, X, ChevronDown, Info } from 'lucide-react';
+import type { CompanyMatchRow } from '@/lib/scoring/jobMatch';
+import { VERDICT_LABEL } from '@/lib/scoring/verdict';
+import { JobFitReport, FitRing, VERDICT_CLASS } from '@/components/matcher/JobFitReport';
 
 export default function CompanyMatcherPage() {
   const [jobDescription, setJobDescription] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<MatchResult[] | null>(null);
+  const [results, setResults] = useState<CompanyMatchRow[] | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = (list: FileList | null) => {
@@ -37,6 +31,7 @@ export default function CompanyMatcherPage() {
     setIsAnalyzing(true);
     setError(null);
     setResults(null);
+    setOpen(null);
 
     try {
       const formData = new FormData();
@@ -57,15 +52,15 @@ export default function CompanyMatcherPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans text-gray-900 dark:text-gray-100 p-6 md:p-10 pb-24">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-5xl mx-auto space-y-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
             <Briefcase className="w-8 h-8 text-blue-600" />
             JD Matcher
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Paste a job description and drop in applicant resumes. CareerLens will rank each
-            resume by how well it matches your requirements.
+            Paste a job description and add applicant resumes. AI extracts each candidate’s academics, experience and projects and checks them against your eligibility criteria.
+            Candidates are then ranked by a fixed role-fit formula.
           </p>
         </div>
 
@@ -75,7 +70,7 @@ export default function CompanyMatcherPage() {
               <label className="block text-sm font-semibold mb-2">Paste Job Description</label>
               <textarea
                 className="w-full h-40 p-4 bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
-                placeholder="e.g. We are looking for a Senior Frontend Engineer with deep experience in React, Next.js, and TypeScript..."
+                placeholder="Include requirements and eligibility (CGPA, 10th/12th %, experience, branches) for the most accurate screening…"
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
                 required
@@ -89,7 +84,7 @@ export default function CompanyMatcherPage() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <UploadCloud className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm font-medium">Click to add resumes (PDF, DOCX, or TXT)</p>
+                <p className="text-sm font-medium">Click to add resumes (PDF, DOCX, or TXT) — up to 25</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -121,7 +116,7 @@ export default function CompanyMatcherPage() {
               disabled={isAnalyzing || !jobDescription || files.length === 0}
               className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
-              {isAnalyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</> : <><Target className="w-4 h-4" /> Rank Applicants</>}
+              {isAnalyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing {files.length} resume{files.length > 1 ? 's' : ''}…</> : <><Target className="w-4 h-4" /> Rank Applicants</>}
             </button>
           </div>
         </form>
@@ -134,10 +129,14 @@ export default function CompanyMatcherPage() {
 
         {results && (
           <div className="space-y-4">
+            <p className="flex items-start gap-2 text-xs text-gray-500">
+              <Info className="w-4 h-4 shrink-0" />
+              Uploaded resumes have no GitHub or portfolio attached, so these scores reflect resume evidence only and confidence is lower. Use them to compare candidates with each other, not as absolute scores.
+            </p>
             {results.map((r, idx) => (
-              <div key={idx} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
-                {r.error ? (
-                  <div className="flex items-center gap-3 text-red-500">
+              <div key={idx} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-sm">
+                {'error' in r ? (
+                  <div className="flex items-center gap-3 text-red-500 p-6">
                     <AlertTriangle className="w-5 h-5" />
                     <div>
                       <p className="font-medium">{r.fileName}</p>
@@ -145,46 +144,34 @@ export default function CompanyMatcherPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="md:col-span-1 flex flex-col items-center justify-center text-center">
-                      <div className="relative mb-2">
-                        <svg className="w-20 h-20 transform -rotate-90">
-                          <circle cx="40" cy="40" r="34" className="text-gray-100 dark:text-zinc-800" strokeWidth="8" stroke="currentColor" fill="transparent" />
-                          <circle
-                            cx="40" cy="40" r="34"
-                            className={`${(r.matchScore ?? 0) >= 80 ? 'text-green-500' : (r.matchScore ?? 0) >= 60 ? 'text-blue-500' : 'text-amber-500'} transition-all duration-1000 ease-out`}
-                            strokeWidth="8" strokeDasharray={34 * 2 * Math.PI} strokeDashoffset={34 * 2 * Math.PI - ((r.matchScore ?? 0) / 100) * 34 * 2 * Math.PI} stroke="currentColor" fill="transparent"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center flex-col">
-                          <span className="text-xl font-black">{r.matchScore}%</span>
+                  <>
+                    <button type="button" onClick={() => setOpen(open === idx ? null : idx)} className="w-full text-left p-6 flex flex-col md:flex-row gap-5 md:items-center">
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-bold text-gray-400 w-6">#{idx + 1}</span>
+                        <FitRing score={r.result.roleFit} verdict={r.result.verdict} size={84} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <p className="font-semibold truncate">{r.candidateName ?? r.fileName}</p>
+                          <span className={`px-2 py-0.5 rounded-full border text-xs font-bold ${VERDICT_CLASS[r.result.verdict]}`}>{VERDICT_LABEL[r.result.verdict]}</span>
+                        </div>
+                        {r.candidateName && <p className="text-xs text-gray-400 truncate mb-1">{r.fileName}</p>}
+                        <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{r.result.assessment?.summary ?? r.result.verdictReason}</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                          {r.result.academics.graduation && <span>CGPA {r.result.academics.graduation.display}</span>}
+                          {r.result.academics.class12 && <span>XII {r.result.academics.class12.display}</span>}
+                          {r.result.academics.class10 && <span>X {r.result.academics.class10.display}</span>}
+                          <span>Required skills met {r.result.coverage.requiredMet}/{r.result.coverage.required}</span>
                         </div>
                       </div>
-                      <p className="text-sm font-medium truncate w-full">{r.fileName}</p>
-                    </div>
-
-                    <div className="md:col-span-3 space-y-3">
-                      <p className="text-sm text-gray-600 dark:text-gray-300">{r.feedback}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {r.matchedSkills?.map((s) => (
-                          <span key={s.name} className="px-2.5 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/50 rounded-lg text-xs font-medium flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> {s.name}
-                          </span>
-                        ))}
-                        {r.missingSkills?.map((s) => (
-                          <span key={s} className="px-2.5 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-lg text-xs font-medium flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> {s}
-                          </span>
-                        ))}
-                        {r.bonusSkills?.map((s) => (
-                          <span key={s} className="px-2.5 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-lg text-xs font-medium flex items-center gap-1">
-                            <PlusCircle className="w-3 h-3" /> {s}
-                          </span>
-                        ))}
+                      <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform shrink-0 ${open === idx ? 'rotate-180' : ''}`} />
+                    </button>
+                    {open === idx && (
+                      <div className="px-4 md:px-6 pb-6 border-t border-gray-100 dark:border-zinc-800 pt-6 bg-gray-50/50 dark:bg-black/20">
+                        <JobFitReport result={r.result} />
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}

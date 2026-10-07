@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* Scan only source folders: automatic detection also watched .next/dev/logs,
+   so every dev log write rebuilt the CSS and reloaded the page in a loop. */
+@import "tailwindcss" source(none);
+@source "../app";
+@source "../components";
+@source "../lib";
 
 :root {
   --background: #ffffff;

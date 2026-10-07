@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { GitFork, Loader2, GitMerge, Search, ShieldCheck } from 'lucide-react';
+import { GitFork, Loader2, GitMerge, Search, ShieldCheck, RefreshCw } from 'lucide-react';
 import type { GithubSkillEvidence } from '@/lib/github/analyzer';
 
 type GithubResults = {
@@ -17,31 +17,48 @@ export default function GithubIntegrationPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<GithubResults | null>(null);
+  const [analyzedAt, setAnalyzedAt] = useState<string | null>(null);
+  const [loadingSaved, setLoadingSaved] = useState(true);
 
-  const handleAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim()) return;
-    
+  // Reopen with the username saved on the account and its last analysis.
+  useEffect(() => {
+    fetch('/api/github/analyze')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const saved = json?.data;
+        if (saved?.username) setUsername(saved.username);
+        if (saved?.snapshot) {
+          setResults(saved.snapshot);
+          setAnalyzedAt(saved.snapshot.analyzedAt ?? null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSaved(false));
+  }, []);
+
+  const analyze = async (name: string) => {
     setIsAnalyzing(true);
     setError(null);
-
     try {
       const res = await fetch('/api/github/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim() }),
+        body: JSON.stringify({ username: name }),
       });
-      
       const data = await res.json();
-      
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
-      
       setResults(data.data);
-    } catch (err: any) {
-      setError(err.message);
+      setAnalyzedAt(new Date().toISOString());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleAnalyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username.trim()) await analyze(username.trim());
   };
 
   return (
@@ -59,7 +76,9 @@ export default function GithubIntegrationPage() {
       </header>
 
       <main className="mx-auto max-w-4xl p-6 mt-6 pb-24">
-        {!results ? (
+        {loadingSaved ? (
+          <div className="flex justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
+        ) : !results ? (
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-10 text-center flex flex-col items-center">
             <div className="w-16 h-16 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
               <GitFork className="w-8 h-8 text-gray-700 dark:text-gray-300" />
@@ -108,14 +127,27 @@ export default function GithubIntegrationPage() {
                 <h2 className="text-2xl font-bold mb-1">GitHub Analysis Complete</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Analyzed <span className="font-semibold text-gray-900 dark:text-white">{results.totalRepos}</span> public repositories for <span className="font-semibold text-gray-900 dark:text-white">@{results.username}</span>
+                  {analyzedAt && <> · last analyzed {new Date(analyzedAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</>}
                 </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Saved to your account and included in your readiness report.</p>
+                {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
               </div>
-              <button 
-                onClick={() => setResults(null)}
-                className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-              >
-                Analyze Another
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => analyze(results.username)}
+                  disabled={isAnalyzing}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                >
+                  {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Re-analyze
+                </button>
+                <button
+                  onClick={() => { setResults(null); setError(null); }}
+                  disabled={isAnalyzing}
+                  className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                >
+                  Change username
+                </button>
+              </div>
             </div>
 
             {/* Contribution Graph */}

@@ -6,8 +6,6 @@ import { Trophy, Loader2, GitMerge, ShieldCheck, Star, ExternalLink, AlertCircle
 import type { Me } from '@/lib/types/me';
 import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO, type CodingHandles, type CodingPlatform } from '@/lib/coding/handles';
 import type { CodingPlatformStats, CodingProfileSummary } from '@/lib/coding/analyzer';
-import { aggregateEvidence, type UnifiedEvidence } from '@/lib/evidence/aggregator';
-import { calculateReadiness } from '@/lib/scoring/engine';
 
 type Errors = Partial<Record<CodingPlatform, string>>;
 
@@ -91,15 +89,11 @@ export default function CodingProfilesPage() {
       if (!meRes.ok) throw new Error(meJson.error || 'Failed to save profile');
       setMe(meJson.data);
 
-      const evRes = await fetch('/api/students/evidence');
-      const existing: UnifiedEvidence | null = evRes.ok ? (await evRes.json()).data?.evidence ?? null : null;
-      const evidence: UnifiedEvidence = existing
-        ? { ...existing, coding: results }
-        : aggregateEvidence(null, null, null, results);
+      // The server re-scores the stored report with the new coding results.
       const saveRes = await fetch('/api/students/evidence', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ evidence, scoring: calculateReadiness(evidence) }),
+        body: JSON.stringify({ coding: results }),
       });
       if (!saveRes.ok) throw new Error((await saveRes.json()).error || 'Failed to update readiness report');
       setSyncState('done');

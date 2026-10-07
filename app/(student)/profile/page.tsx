@@ -223,8 +223,8 @@ export default function ProfilePage() {
               ) : (
                 <>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">No readiness report yet.</p>
-                  <Link href="/onboarding" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline">
-                    Upload &amp; analyze your resume <ArrowRight className="w-4 h-4" />
+                  <Link href="/profile/resume" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline">
+                    Upload your resume <ArrowRight className="w-4 h-4" />
                   </Link>
                 </>
               )}
