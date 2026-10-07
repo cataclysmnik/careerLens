@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import type { ScoringResult } from "@/lib/scoring/engine";
 import type { UnifiedEvidence } from "@/lib/evidence/aggregator";
+import { readinessTier, TIER_ORDER, type ReadinessTier } from "@/lib/readiness";
 
 export async function GET() {
   const session = await auth();
@@ -10,43 +11,99 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rows = await prisma.studentEvidence.findMany();
-  const totalStudents = await prisma.user.count({ where: { role: "STUDENT" } });
+  const [students, pendingApprovals] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: "STUDENT" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        profile: { select: { targetRole: true } },
+        evidence: { select: { evidence: true, scoring: true, updatedAt: true } },
+      },
+    }),
+    prisma.user.count({ where: { status: "PENDING" } }),
+  ]);
 
-  const scores = rows.map((r) => (r.scoring as unknown as ScoringResult).overallScore);
-  const averageScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const analyzed = students
+    .filter((s) => s.evidence)
+    .map((s) => {
+      const scoring = s.evidence!.scoring as unknown as ScoringResult;
+      const evidence = s.evidence!.evidence as unknown as UnifiedEvidence;
+      return { id: s.id, name: s.name, email: s.email, scoring, evidence, updatedAt: s.evidence!.updatedAt };
+    });
+  const n = analyzed.length;
+  const pct = (count: number) => (n > 0 ? Math.round((count / n) * 100) : 0);
 
-  const buckets = { "0-40": 0, "41-60": 0, "61-80": 0, "81-100": 0 };
+  const scores = analyzed.map((a) => a.scoring.overallScore);
+  const averageScore = n > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / n) : 0;
+
+  const scoreDistribution = { "0-40": 0, "41-60": 0, "61-80": 0, "81-100": 0 };
   scores.forEach((s) => {
-    if (s <= 40) buckets["0-40"]++;
-    else if (s <= 60) buckets["41-60"]++;
-    else if (s <= 80) buckets["61-80"]++;
-    else buckets["81-100"]++;
+    if (s <= 40) scoreDistribution["0-40"]++;
+    else if (s <= 60) scoreDistribution["41-60"]++;
+    else if (s <= 80) scoreDistribution["61-80"]++;
+    else scoreDistribution["81-100"]++;
   });
 
-  const withGithub = rows.filter((r) => (r.evidence as unknown as UnifiedEvidence).hasGithub).length;
-  const withPortfolio = rows.filter((r) => (r.evidence as unknown as UnifiedEvidence).hasPortfolio).length;
+  const tierCounts = Object.fromEntries(TIER_ORDER.map((t) => [t, 0])) as Record<ReadinessTier, number>;
+  tierCounts.NOT_ANALYZED = students.length - n;
+  scores.forEach((s) => tierCounts[readinessTier(s)]++);
+
+  const categoryTotals = new Map<string, number>();
+  analyzed.forEach((a) =>
+    a.scoring.categories.forEach((c) => categoryTotals.set(c.title, (categoryTotals.get(c.title) ?? 0) + c.score))
+  );
+  const categoryAverages = Array.from(categoryTotals, ([title, total]) => ({ title, average: Math.round(total / n) }));
 
   const gapCounts = new Map<string, number>();
-  rows.forEach((r) => {
-    (r.scoring as unknown as ScoringResult).gaps.forEach((g) => {
-      gapCounts.set(g.title, (gapCounts.get(g.title) ?? 0) + 1);
-    });
+  analyzed.forEach((a) => a.scoring.gaps.forEach((g) => gapCounts.set(g.title, (gapCounts.get(g.title) ?? 0) + 1)));
+  const topGaps = Array.from(gapCounts, ([title, count]) => ({ title, count, pct: pct(count) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  const roleCounts = new Map<string, number>();
+  students.forEach((s) => {
+    const role = s.profile?.targetRole?.trim() || "Not set";
+    roleCounts.set(role, (roleCounts.get(role) ?? 0) + 1);
   });
-  const topGaps = Array.from(gapCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([title, count]) => ({ title, count }));
+  const targetRoles = Array.from(roleCounts, ([role, count]) => ({ role, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  const brief = (a: (typeof analyzed)[number]) => ({
+    id: a.id,
+    name: a.name,
+    email: a.email,
+    score: a.scoring.overallScore,
+    topGap: a.scoring.gaps[0]?.title ?? null,
+    updatedAt: a.updatedAt,
+  });
+  const byScore = [...analyzed].sort((a, b) => b.scoring.overallScore - a.scoring.overallScore);
 
   return NextResponse.json({
     data: {
-      totalStudents,
-      analyzedStudents: rows.length,
+      totalStudents: students.length,
+      analyzedStudents: n,
       averageScore,
-      scoreDistribution: buckets,
-      pctWithGithub: rows.length > 0 ? Math.round((withGithub / rows.length) * 100) : 0,
-      pctWithPortfolio: rows.length > 0 ? Math.round((withPortfolio / rows.length) * 100) : 0,
+      scoreDistribution,
+      tierCounts,
+      categoryAverages,
+      pctWithGithub: pct(analyzed.filter((a) => a.evidence.hasGithub).length),
+      pctWithPortfolio: pct(analyzed.filter((a) => a.evidence.hasPortfolio).length),
       topGaps,
+      targetRoles,
+      topStudents: byScore.slice(0, 5).map(brief),
+      needsAttention: byScore
+        .filter((a) => readinessTier(a.scoring.overallScore) === "NEEDS_SUPPORT")
+        .reverse()
+        .slice(0, 5)
+        .map(brief),
+      recentlyAnalyzed: [...analyzed]
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        .slice(0, 5)
+        .map(brief),
+      pendingApprovals,
     },
   });
 }

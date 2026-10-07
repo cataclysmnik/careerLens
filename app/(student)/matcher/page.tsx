@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, Target, AlertTriangle, CheckCircle2, Loader2, PlusCircle, ShieldCheck } from 'lucide-react';
 import type { UnifiedEvidence } from '@/lib/evidence/aggregator';
-import { aggregateEvidence } from '@/lib/evidence/aggregator';
 
 type MatchResult = {
   matchScore: number;
@@ -21,18 +20,24 @@ export default function JobMatcherPage() {
   const [evidence, setEvidence] = useState<UnifiedEvidence | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('careerlens_pipeline');
-      if (stored) {
-        const { resume, github, portfolio } = JSON.parse(stored);
-        const unifiedEvidence = aggregateEvidence(resume, github, portfolio);
-        setEvidence(unifiedEvidence);
-      } else {
-        setError("No profile found. Please upload your resume on the onboarding page first.");
+    (async () => {
+      try {
+        const res = await fetch('/api/students/evidence');
+        if (res.ok) {
+          const { data } = await res.json();
+          if (data) {
+            setEvidence(data.evidence);
+          } else {
+            setError("No profile found. Please upload your resume on the onboarding page first.");
+          }
+        } else {
+          setError("Couldn't load your profile. Refresh the page to try again.");
+        }
+      } catch (e) {
+        console.error(e);
+        setError("Couldn't load your profile. Refresh the page to try again.");
       }
-    } catch (e) {
-      console.error(e);
-    }
+    })();
   }, []);
 
   const handleMatch = async (e: React.FormEvent) => {

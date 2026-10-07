@@ -37,9 +37,8 @@ export async function GET() {
     where: { userId: session.user.id },
   });
 
-  if (!row) {
-    return NextResponse.json({ error: "No evidence found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ data: { evidence: row.evidence, scoring: row.scoring } });
+  // A student who hasn't run an analysis yet is a normal state, not an error.
+  return NextResponse.json({
+    data: row ? { evidence: row.evidence, scoring: row.scoring, updatedAt: row.updatedAt } : null,
+  });
 }

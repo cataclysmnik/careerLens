@@ -121,15 +121,8 @@ export default function OnboardingPage() {
         }
       }
 
-      // Final Step: Save to LocalStorage and show results
       setStep(5);
       setStatusText('Career Readiness Model Generated!');
-      
-      localStorage.setItem('careerlens_pipeline', JSON.stringify({
-        resume: parsedResume,
-        github: githubData,
-        portfolio: portfolioData
-      }));
 
       // Persist to the server so the dashboard, placement cell, and future
       // devices/browsers can all see this student's evidence and score.

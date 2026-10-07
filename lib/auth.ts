@@ -1,12 +1,21 @@
-import NextAuth from "next-auth"
+import NextAuth, { customFetch } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { prisma } from "@/lib/db/prisma"
 import bcrypt from "bcryptjs"
+import { SKIP_APPROVAL } from "@/lib/demo"
+import { initialStatusFor, parseRole } from "@/lib/accountStatus"
+import { SIGNUP_ROLE_COOKIE } from "@/lib/signupRole"
+import { cookies } from "next/headers"
+import { ipv4Fetch } from "@/lib/ipv4Fetch"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
-    Google,
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      [customFetch]: ipv4Fetch,
+    }),
     Credentials({
       name: "Credentials",
       credentials: {
@@ -37,7 +46,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         // Pending Company/Placement-Cell accounts cannot sign in until approved.
         if (user.status === "PENDING") {
-          return null
+          if (!SKIP_APPROVAL) return null
+          await prisma.user.update({ where: { id: user.id }, data: { status: "ACTIVE" } })
         }
 
         return {
@@ -45,7 +55,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
-          status: user.status,
+          status: "ACTIVE",
         }
       }
     })
@@ -63,28 +73,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return false
       }
 
-      // First-time Google sign-in: provision a STUDENT account, mirroring
-      // what /api/register does for the credentials flow.
+      // First-time Google sign-in: provision an account with the role picked
+      // on the register page (defaults to STUDENT), mirroring /api/register.
       const existing = await prisma.user.findUnique({ where: { email: user.email } })
       if (!existing) {
+        const cookieStore = await cookies()
+        const role = parseRole(cookieStore.get(SIGNUP_ROLE_COOKIE)?.value)
+        cookieStore.delete(SIGNUP_ROLE_COOKIE)
+        const status = await initialStatusFor(role)
         await prisma.user.create({
           data: {
             email: user.email,
             name: user.name,
             image: user.image,
-            role: "STUDENT",
-            status: "ACTIVE",
-            profile: { create: {} },
+            role,
+            status,
+            ...(role === "STUDENT" && { profile: { create: {} } }),
           }
         })
+        if (status === "PENDING") return "/pending-approval"
       } else if (existing.status === "PENDING") {
         // Company/Placement-Cell accounts still awaiting approval.
-        return false
+        if (!SKIP_APPROVAL) return "/pending-approval"
+        await prisma.user.update({ where: { id: existing.id }, data: { status: "ACTIVE" } })
       }
 
       return true
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
+      if (trigger === "update" && token.sub) {
+        // Profile edits change the display name; refresh it from the DB
+        // rather than trusting client-supplied session data.
+        const dbUser = await prisma.user.findUnique({ where: { id: token.sub } })
+        if (dbUser) token.name = dbUser.name
+        return token
+      }
       if (user) {
         token.role = user.role
         token.status = user.status

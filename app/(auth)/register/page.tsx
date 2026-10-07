@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { GraduationCap, Building2, ShieldCheck } from 'lucide-react';
+import { SKIP_APPROVAL } from '@/lib/demo';
+import { SIGNUP_ROLE_COOKIE } from '@/lib/signupRole';
 
 type RoleOption = 'STUDENT' | 'PLACEMENT_CELL' | 'COMPANY';
 
@@ -23,6 +25,12 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const nameLabel = role === 'COMPANY' ? 'Company Name' : 'Full Name';
+
+  // Only applies if this Google account is new; existing accounts keep their role.
+  const handleGoogle = () => {
+    document.cookie = `${SIGNUP_ROLE_COOKIE}=${role}; path=/; max-age=600; samesite=lax`;
+    signIn('google', { callbackUrl: '/dashboard' });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +91,7 @@ export default function RegisterPage() {
           })}
         </div>
 
-        {role !== 'STUDENT' && (
+        {role !== 'STUDENT' && !SKIP_APPROVAL && (
           <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/50 rounded-lg p-3">
             {role === 'COMPANY' ? 'Company' : 'Placement Cell'} accounts require approval from an
             existing Placement Cell member before you can sign in.
@@ -142,25 +150,21 @@ export default function RegisterPage() {
             </button>
           </div>
 
-          {role === 'STUDENT' && (
-            <>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200 dark:border-zinc-800" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-white dark:bg-zinc-900 px-2 text-gray-400">or</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 dark:border-zinc-700 px-3 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-800"
-              >
-                Continue with Google
-              </button>
-            </>
-          )}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200 dark:border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-white dark:bg-zinc-900 px-2 text-gray-400">or</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleGoogle}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 dark:border-zinc-700 px-3 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-800"
+          >
+            Continue with Google as {ROLE_OPTIONS.find((o) => o.value === role)?.label}
+          </button>
 
           <div className="text-center text-sm">
             <span className="text-gray-500">Already have an account? </span>

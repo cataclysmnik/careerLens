@@ -3,15 +3,15 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
-import { LayoutDashboard, FileText, GitFork, Globe, User, Briefcase, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, GitFork, Globe, User, Briefcase } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { SidebarUserCard } from './SidebarUserCard';
 
 const navItems = [
   { name: 'Upload & Analyze', href: '/onboarding', icon: FileText },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Job Matcher', href: '/matcher', icon: Briefcase },
-  { name: 'Profile Settings', href: '/profile', icon: User },
+  { name: 'My Profile', href: '/profile', icon: User },
   { name: 'Resume Parser', href: '/profile/resume', icon: FileText },
   { name: 'GitHub Analyzer', href: '/profile/github', icon: GitFork },
   { name: 'Portfolio Scanner', href: '/profile/portfolio', icon: Globe },
@@ -51,15 +51,7 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-200 dark:border-zinc-800">
-          <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/10 dark:hover:text-red-400 transition-colors"
-          >
-            <LogOut className="w-5 h-5 text-gray-400" />
-            Sign Out
-          </button>
-        </div>
+        <SidebarUserCard profileHref="/profile" />
       </aside>
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
