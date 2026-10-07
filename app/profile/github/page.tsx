@@ -119,45 +119,67 @@ export default function GithubIntegrationPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {results.evidence.map((ev, idx) => (
-                <div key={idx} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-5 hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="font-bold text-lg">{ev.skill}</h3>
-                    <span className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full ${
-                      ev.strength === 'Strong' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' :
-                      ev.strength === 'Moderate' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
-                      'bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-400'
-                    }`}>
-                      {ev.strength} Evidence
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">Repositories</span>
-                      <span className="font-medium">{ev.repoCount}</span>
+                <details key={idx} className="group bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="list-none cursor-pointer p-5 focus:outline-none">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="font-bold text-lg group-open:text-blue-600 dark:group-open:text-blue-400 transition-colors">{ev.skill}</h3>
+                      <span className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full ${
+                        ev.strength === 'Strong' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' :
+                        ev.strength === 'Moderate' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                        'bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-400'
+                      }`}>
+                        {ev.strength} Evidence
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">Recent Activity (6mo)</span>
-                      <span className="font-medium">{ev.recentProjects}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">Infrastructure</span>
-                      <div className="flex gap-2">
-                        {ev.isDeployed && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">Deployed</span>}
-                        {ev.hasDocker && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">Docker</span>}
-                        {ev.hasTests && <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded">Tested</span>}
-                        {!ev.isDeployed && !ev.hasDocker && !ev.hasTests && <span className="text-gray-400 text-xs">Basic</span>}
+                    
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Repositories</span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400 group-hover:underline">{ev.repoCount} (Click to expand)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Recent Activity (6mo)</span>
+                        <span className="font-medium">{ev.recentProjects}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Infrastructure</span>
+                        <div className="flex gap-2">
+                          {ev.isDeployed && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">Deployed</span>}
+                          {ev.hasDocker && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">Docker</span>}
+                          {ev.hasTests && <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded">Tested</span>}
+                          {!ev.isDeployed && !ev.hasDocker && !ev.hasTests && <span className="text-gray-400 text-xs">Basic</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="pt-3 border-t border-gray-100 dark:border-zinc-800 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-blue-500" />
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                      Confidence Score: <span className="text-gray-900 dark:text-white">{(ev.confidence * 100).toFixed(0)}%</span>
-                    </span>
+                    <div className="pt-3 border-t border-gray-100 dark:border-zinc-800 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-500" />
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        Confidence Score: <span className="text-gray-900 dark:text-white">{(ev.confidence * 100).toFixed(0)}%</span>
+                      </span>
+                    </div>
+                  </summary>
+
+                  {/* Expanded Projects Section */}
+                  <div className="p-5 pt-0 border-t border-gray-100 dark:border-zinc-800">
+                    <div className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">Matched Projects</div>
+                    <ul className="flex flex-wrap gap-2">
+                      {ev.repositories?.map((repo, rIdx) => (
+                        <li key={rIdx}>
+                          <a 
+                            href={`https://github.com/${results.username}/${repo.name}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-zinc-900/50 rounded-lg border border-gray-200 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all shadow-sm"
+                          >
+                            <Github className="w-3.5 h-3.5" />
+                            {repo.name}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
+                </details>
               ))}
             </div>
 

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, Github, Globe, User, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, Github, Globe, User, Settings, LogOut, Briefcase } from 'lucide-react';
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -16,6 +16,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { name: 'Upload & Analyze', href: '/onboarding', icon: FileText },
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Job Matcher', href: '/matcher', icon: Briefcase },
     { name: 'Profile Settings', href: '/profile', icon: User },
     { name: 'Resume Parser', href: '/profile/resume', icon: FileText },
     { name: 'GitHub Analyzer', href: '/profile/github', icon: Github },

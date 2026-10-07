@@ -10,6 +10,7 @@ export default function OnboardingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [scrapedData, setScrapedData] = useState<{ github: any, portfolio: any } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -45,12 +46,35 @@ export default function OnboardingPage() {
         if (link.includes('github.com')) {
           const parts = link.split('github.com/');
           if (parts[1]) githubUsername = parts[1].split('/')[0];
-        } else if (
-          !link.includes('linkedin.com') && 
-          !link.includes('@') && // ignore emails
-          !link.includes('mailto:')
-        ) {
-          if (!portfolioUrl) portfolioUrl = link; // Heuristic: first non-linkedin/github non-email link is portfolio
+        } else {
+          // Parse the URL to get the exact hostname for safer blocking
+          let hostname = link.toLowerCase();
+          try {
+            hostname = new URL(link).hostname.replace(/^www\./, '');
+          } catch(e) {
+            hostname = hostname.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+          }
+
+          const isEmail = link.includes('@') || link.includes('mailto:');
+          
+          // Platforms where the NAKED domain is never a portfolio (e.g., vercel.app, github.io)
+          // But SUBDOMAINS (e.g. sagnik.vercel.app) are allowed!
+          const nakedPlatforms = ['vercel.app', 'netlify.app', 'github.io', 'heroku.com', 'render.com', 'firebaseapp.com'];
+          
+          // Domains that are NEVER a portfolio, even as subdomains
+          const ignoreDomains = [
+            'linkedin.com', 'twitter.com', 'x.com', 'facebook.com', 
+            'instagram.com', 'outlook.com', 'gmail.com', 'google.com', 
+            'yahoo.com', 'youtube.com', 'medium.com', 'dev.to', 'hashnode.com',
+            'github.com' // Github handled above
+          ];
+          
+          const isIgnoredDomain = ignoreDomains.some(domain => hostname.includes(domain)) || 
+                                  nakedPlatforms.includes(hostname); // Only block if it is exactly the naked platform
+
+          if (!isEmail && !isIgnoredDomain) {
+            if (!portfolioUrl) portfolioUrl = link; 
+          }
         }
       });
 
@@ -95,9 +119,9 @@ export default function OnboardingPage() {
         }
       }
 
-      // Final Step: Save to LocalStorage and Redirect
+      // Final Step: Save to LocalStorage and show results
       setStep(5);
-      setStatusText('Generating Career Readiness Model...');
+      setStatusText('Career Readiness Model Generated!');
       
       localStorage.setItem('careerlens_pipeline', JSON.stringify({
         resume: parsedResume,
@@ -105,9 +129,10 @@ export default function OnboardingPage() {
         portfolio: portfolioData
       }));
 
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1000);
+      setScrapedData({
+        github: githubData,
+        portfolio: portfolioData
+      });
 
     } catch (err: any) {
       setError(err.message);
@@ -186,12 +211,62 @@ export default function OnboardingPage() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{statusText}</h2>
             </div>
 
-            <div className="space-y-4 max-w-sm mx-auto">
-              <StepIndicator icon={FileText} title="Parsing Resume" active={step >= 2} completed={step > 2} />
-              <StepIndicator icon={Github} title="GitHub Analysis" active={step >= 3} completed={step > 3} />
-              <StepIndicator icon={Globe} title="Portfolio Scanning" active={step >= 4} completed={step > 4} />
-              <StepIndicator icon={CheckCircle2} title="Finalizing Profile" active={step >= 5} completed={step > 5} />
-            </div>
+            {!scrapedData ? (
+              <div className="space-y-4 max-w-sm mx-auto">
+                <StepIndicator icon={FileText} title="Parsing Resume" active={step >= 2} completed={step > 2} />
+                <StepIndicator icon={Github} title="GitHub Analysis" active={step >= 3} completed={step > 3} />
+                <StepIndicator icon={Globe} title="Portfolio Scanning" active={step >= 4} completed={step > 4} />
+                <StepIndicator icon={CheckCircle2} title="Finalizing Profile" active={step >= 5} completed={step > 5} />
+              </div>
+            ) : (
+              <div className="space-y-6 w-full text-left">
+                {scrapedData.github && (
+                  <div className="p-4 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl">
+                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+                      <Github className="w-5 h-5" /> Scraped GitHub Data
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      Found <span className="font-bold">{scrapedData.github.totalRepos}</span> total repositories for <span className="font-bold">@{scrapedData.github.username}</span>.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {scrapedData.github.evidence.map((ev: any, idx: number) => (
+                        <span key={idx} className="px-2.5 py-1 text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-sm">
+                          {ev.skill} ({ev.repoCount} Repos)
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {scrapedData.portfolio && (
+                  <div className="p-4 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl">
+                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+                      <Globe className="w-5 h-5" /> Scraped Portfolio Data
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 truncate">
+                      <span className="font-bold">URL:</span> {scrapedData.portfolio.url}
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="p-3 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg">
+                        <div className="text-xs text-gray-500 uppercase font-bold mb-1">SEO Score</div>
+                        <div className="text-lg font-bold">{scrapedData.portfolio.seoScore}/100</div>
+                      </div>
+                      <div className="p-3 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg">
+                        <div className="text-xs text-gray-500 uppercase font-bold mb-1">A11y Score</div>
+                        <div className="text-lg font-bold">{scrapedData.portfolio.accessibilityScore}/100</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="w-full py-3.5 mt-4 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all shadow-md active:scale-[0.98]"
+                >
+                  View Full Career Dashboard
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

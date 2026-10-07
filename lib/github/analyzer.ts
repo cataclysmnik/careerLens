@@ -10,6 +10,7 @@ export type GithubSkillEvidence = {
   hasDocker: boolean;
   confidence: number;
   strength: 'Strong' | 'Moderate' | 'Weak';
+  repositories: { name: string; description: string | null }[]; // List of repos that use this skill
 };
 
 export function analyzeGithubProfile(repos: GithubRepo[]): GithubSkillEvidence[] {
@@ -25,7 +26,8 @@ export function analyzeGithubProfile(repos: GithubRepo[]): GithubSkillEvidence[]
         hasTests: false,
         hasDocker: false,
         confidence: 0,
-        strength: 'Weak'
+        strength: 'Weak',
+        repositories: []
       });
     }
     return skillMap.get(skill)!;
@@ -68,6 +70,9 @@ export function analyzeGithubProfile(repos: GithubRepo[]): GithubSkillEvidence[]
 
       const evidence = initializeSkill(skill);
       evidence.repoCount += 1;
+      if (!evidence.repositories.find(r => r.name === repo.name)) {
+        evidence.repositories.push({ name: repo.name, description: repo.description });
+      }
       if (isRecent) evidence.recentProjects += 1;
       if (isDeployed) evidence.isDeployed = true;
       if (hasTests) evidence.hasTests = true;

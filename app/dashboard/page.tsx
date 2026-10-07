@@ -6,7 +6,7 @@ import { ReadinessScore } from "@/components/dashboard/ReadinessScore";
 import { CategoryScoreCard } from "@/components/dashboard/CategoryScoreCard";
 import { StrengthsAndGaps } from "@/components/dashboard/StrengthsAndGaps";
 import { RecommendedActions } from "@/components/dashboard/RecommendedActions";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, Loader2, Github } from "lucide-react";
 import { aggregateEvidence, UnifiedEvidence } from "@/lib/evidence/aggregator";
 import { calculateReadiness, ScoringResult } from "@/lib/scoring/engine";
 
@@ -109,47 +109,74 @@ export default function DashboardPage() {
             Verified Skills Model
           </h3>
           {evidence && evidence.skills.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
-                <thead className="bg-gray-50 dark:bg-zinc-800/50 text-gray-700 dark:text-gray-300 uppercase text-xs">
-                  <tr>
-                    <th className="px-4 py-3 rounded-l-lg">Skill</th>
-                    <th className="px-4 py-3 text-center">Resume</th>
-                    <th className="px-4 py-3 text-center">GitHub Repos</th>
-                    <th className="px-4 py-3 text-center">Portfolio</th>
-                    <th className="px-4 py-3 rounded-r-lg text-right">Confidence</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {evidence.skills.map((skill, idx) => (
-                    <tr key={idx} className="border-b border-gray-100 dark:border-zinc-800 last:border-0 hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{skill.name}</td>
-                      <td className="px-4 py-3 text-center">
-                        {skill.mentionedInResume ? <span className="text-green-500 font-bold">✓</span> : <span className="text-gray-300 dark:text-gray-700">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {skill.githubRepoCount > 0 ? (
-                          <span className="inline-flex items-center justify-center bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full">
-                            {skill.githubRepoCount}
-                          </span>
-                        ) : <span className="text-gray-300 dark:text-gray-700">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {skill.isDeployed ? <span className="text-blue-500 font-bold">✓</span> : <span className="text-gray-300 dark:text-gray-700">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                          skill.strength === 'Strong' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                          skill.strength === 'Moderate' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                          'bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-400'
-                        }`}>
-                          {Math.round(skill.confidenceScore * 100)}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              {evidence.skills.map((skill, idx) => (
+                <details key={idx} className="group bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="list-none cursor-pointer p-5 focus:outline-none">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="font-bold text-lg group-open:text-blue-600 dark:group-open:text-blue-400 transition-colors">{skill.name}</h3>
+                      <span className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full ${
+                        skill.strength === 'Strong' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' :
+                        skill.strength === 'Moderate' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' :
+                        'bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-400'
+                      }`}>
+                        {skill.strength} Evidence
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Repositories</span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400 group-hover:underline">{skill.githubRepoCount} (Click to expand)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Mentioned in Resume</span>
+                        {skill.mentionedInResume ? <span className="font-bold text-green-500">Yes</span> : <span className="text-gray-400">No</span>}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Infrastructure</span>
+                        <div className="flex gap-2">
+                          {skill.isDeployed && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">Deployed</span>}
+                          {skill.hasGithubDocker && <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">Docker</span>}
+                          {skill.hasGithubTests && <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded">Tested</span>}
+                          {!skill.isDeployed && !skill.hasGithubDocker && !skill.hasGithubTests && <span className="text-gray-400 text-xs">Basic</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-100 dark:border-zinc-800 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-500" />
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        Confidence Score: <span className="text-gray-900 dark:text-white">{Math.round(skill.confidenceScore * 100)}%</span>
+                      </span>
+                    </div>
+                  </summary>
+
+                  {/* Expanded Projects Section */}
+                  <div className="p-5 pt-0 border-t border-gray-100 dark:border-zinc-800">
+                    <div className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">Matched Projects</div>
+                    {skill.githubRepositories.length > 0 ? (
+                      <ul className="flex flex-wrap gap-2">
+                        {skill.githubRepositories.map((repo, rIdx) => (
+                          <li key={rIdx}>
+                            <a 
+                              href={evidence.contactInfo.links.find(l => l.includes('github.com')) ? `https://github.com/${evidence.contactInfo.links.find(l => l.includes('github.com'))?.split('github.com/')[1]?.split('/')[0]}/${repo.name}` : '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-zinc-900/50 rounded-lg border border-gray-200 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all shadow-sm"
+                            >
+                              <Github className="w-3.5 h-3.5" />
+                              {repo.name}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic">No specific repositories detected for this skill.</p>
+                    )}
+                  </div>
+                </details>
+              ))}
             </div>
           ) : (
             <p className="text-sm text-gray-500">No skills detected. Upload a resume to build your model.</p>

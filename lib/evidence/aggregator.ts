@@ -12,6 +12,7 @@ export type UnifiedSkill = {
   isDeployed: boolean;
   confidenceScore: number; // 0 to 1
   strength: 'Strong' | 'Moderate' | 'Weak';
+  githubRepositories: { name: string; description: string | null }[];
 };
 
 export type UnifiedEvidence = {
@@ -44,7 +45,8 @@ export function aggregateEvidence(
         hasGithubDocker: false,
         isDeployed: false,
         confidenceScore: 0.3, // Baseline for just being on resume
-        strength: 'Weak'
+        strength: 'Weak',
+        githubRepositories: []
       });
     });
   }
@@ -61,10 +63,16 @@ export function aggregateEvidence(
         hasGithubDocker: false,
         isDeployed: false,
         confidenceScore: 0,
-        strength: 'Weak'
+        strength: 'Weak',
+        githubRepositories: []
       };
 
       existing.githubRepoCount = ghSkill.repoCount;
+      // Deduplicate by name
+      const allRepos = [...existing.githubRepositories, ...(ghSkill.repositories || [])];
+      existing.githubRepositories = allRepos.filter((r, idx, self) => 
+        idx === self.findIndex((t) => t.name === r.name)
+      );
       existing.hasGithubTests = ghSkill.hasTests;
       existing.hasGithubDocker = ghSkill.hasDocker;
       existing.isDeployed = ghSkill.isDeployed || existing.isDeployed;
@@ -97,7 +105,8 @@ export function aggregateEvidence(
         hasGithubDocker: false,
         isDeployed: true, // If it's on their live portfolio, it's deployed
         confidenceScore: 0.5, 
-        strength: 'Moderate'
+        strength: 'Moderate',
+        githubRepositories: []
       };
       
       existing.isDeployed = true;

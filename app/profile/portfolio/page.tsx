@@ -152,11 +152,11 @@ export default function PortfolioIntegrationPage() {
               {/* Technical Signals */}
               <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  <Code2 className="w-5 h-5 text-emerald-500" /> Technical Signals
+                  <Code2 className="w-5 h-5 text-emerald-500" /> Engineering & UX
                 </h3>
                 
-                <div className="mb-4">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">Detected Frameworks</span>
+                <div className="mb-6">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-3">Detected Frameworks</span>
                   {results.detectedFrameworks.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {results.detectedFrameworks.map((fw, i) => (
@@ -170,17 +170,37 @@ export default function PortfolioIntegrationPage() {
                   )}
                 </div>
 
-                <div>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">SEO & Accessibility</span>
-                  <div className="p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                      <span className="font-semibold text-gray-900 dark:text-gray-200">Title: </span>
-                      {results.title || 'Missing <title> tag'}
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-                      <span className="font-semibold text-gray-900 dark:text-gray-200">Description: </span>
-                      {results.metaDescription || 'Missing <meta name="description">'}
-                    </p>
+                <div className="space-y-4">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block">Quality Heuristics</span>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className={`p-3 rounded-lg border ${results.seoScore > 70 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'} dark:bg-transparent dark:border-zinc-800 dark:text-gray-300`}>
+                      <div className="text-xs uppercase tracking-wide opacity-70 mb-1">SEO Score</div>
+                      <div className="font-bold text-xl">{results.seoScore}/100</div>
+                    </div>
+                    <div className={`p-3 rounded-lg border ${results.accessibilityScore > 70 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'} dark:bg-transparent dark:border-zinc-800 dark:text-gray-300`}>
+                      <div className="text-xs uppercase tracking-wide opacity-70 mb-1">A11y Score</div>
+                      <div className="font-bold text-xl">{results.accessibilityScore}/100</div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between text-sm py-1">
+                      <span className="text-gray-600 dark:text-gray-400">Dark Mode Support</span>
+                      {results.features?.hasDarkMode ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gray-400">✗</span>}
+                    </div>
+                    <div className="flex items-center justify-between text-sm py-1">
+                      <span className="text-gray-600 dark:text-gray-400">Semantic HTML Tags</span>
+                      {results.features?.hasSemanticHtml ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gray-400">✗</span>}
+                    </div>
+                    <div className="flex items-center justify-between text-sm py-1">
+                      <span className="text-gray-600 dark:text-gray-400">Mobile Responsive</span>
+                      {results.features?.hasResponsiveMeta ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gray-400">✗</span>}
+                    </div>
+                    <div className="flex items-center justify-between text-sm py-1">
+                      <span className="text-gray-600 dark:text-gray-400">OpenGraph (Social Share)</span>
+                      {results.features?.hasOpenGraph ? <span className="text-green-600 font-bold">✓</span> : <span className="text-gray-400">✗</span>}
+                    </div>
                   </div>
                 </div>
               </div>
