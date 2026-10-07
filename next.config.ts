@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     agentFeedback: true,
+    // The MCP endpoint makes next dev write browser logs to .next/dev/logs on
+    // every page load. That write was being picked up as a change, rebuilding
+    // and reloading the page in an endless loop. Nothing in the app uses it.
+    mcpServer: false,
   },
   cacheComponents: true,
   partialPrefetching: true,
