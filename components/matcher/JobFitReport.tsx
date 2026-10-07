@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   CheckCircle2, XCircle, HelpCircle, AlertTriangle, Sparkles, Lightbulb, MessageSquareQuote,
-  ListChecks, TrendingUp, PlusCircle, GraduationCap, Briefcase, FolderGit2, Info,
+  ListChecks, TrendingUp, PlusCircle, GraduationCap, Briefcase, FolderGit2, Info, Globe, ExternalLink,
 } from 'lucide-react';
 import type { JobFitResult } from '@/lib/scoring/jobMatch';
 import { VERDICT_LABEL, type FitVerdict } from '@/lib/scoring/verdict';
@@ -82,6 +82,54 @@ export function FitRing({ score, verdict, size = 128 }: { score: number; verdict
   );
 }
 
+/** Where a researched role's requirements came from: live postings or the role catalog. */
+function ResearchSources({ research }: { research: NonNullable<JobFitResult['research']> }) {
+  const fromPostings = research.method === 'job_postings';
+  return (
+    <div className={card}>
+      <h3 className="font-bold mb-1 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-600" /> Where these requirements come from</h3>
+      <p className="text-sm text-gray-500 mb-4">
+        {fromPostings
+          ? <>Measured from <b>{research.postingCount}</b> current {research.role} postings: each skill&apos;s importance is the share of postings that ask for it (60%+ → 5, 40%+ → 4, 25%+ → 3, 15%+ → 2, 10%+ → 1).</>
+          : <>Too few current postings matched “{research.role}”, so CareerLens&apos;s built-in {research.role} profile was used instead.</>}
+        {' '}Fetched {new Date(research.fetchedAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.
+      </p>
+      {fromPostings && research.frequencies.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 mb-5">
+          {research.frequencies.slice(0, 12).map((f) => (
+            <div key={f.id} className="flex items-center gap-3 text-sm">
+              <span className="w-32 truncate">{f.label}</span>
+              <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-zinc-800 overflow-hidden">
+                <div className="h-full bg-blue-600 rounded-full" style={{ width: `${Math.round(f.share * 100)}%` }} />
+              </div>
+              <span className="w-10 text-right text-xs text-gray-500">{Math.round(f.share * 100)}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {research.postings.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-blue-600 font-medium">Postings analyzed ({research.postings.length}{research.postingCount > research.postings.length ? ` of ${research.postingCount}` : ''})</summary>
+          <ul className="mt-3 space-y-1.5">
+            {research.postings.map((p, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <ExternalLink className="w-3.5 h-3.5 mt-0.5 text-gray-400 shrink-0" />
+                <a href={p.url} target="_blank" rel="noreferrer" className="hover:underline">
+                  {p.title}{p.company ? <span className="text-gray-500"> · {p.company}</span> : null}
+                </a>
+                <span className="text-xs text-gray-400 ml-auto shrink-0">{p.source}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <p className="text-[11px] text-gray-400 mt-4">
+        Sources: {research.sourcesTried.map((s) => `${s.source}${s.ok ? '' : ' (unavailable)'}`).join(', ')}. Mostly remote and international listings, so treat this as the typical bar for the role rather than one company&apos;s criteria.
+      </p>
+    </div>
+  );
+}
+
 export function JobFitReport({ result }: { result: JobFitResult }) {
   const a = result.assessment;
   const jobLine = [result.job.title, result.job.company].filter(Boolean).join(' · ');
@@ -112,10 +160,16 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
         </div>
       </div>
 
+      {result.research && <ResearchSources research={result.research} />}
+
       {/* Eligibility */}
       <div className={card}>
         <h3 className="font-bold mb-1 flex items-center gap-2"><GraduationCap className="w-5 h-5 text-blue-600" /> Eligibility</h3>
-        <p className="text-sm text-gray-500 mb-4">{ELIGIBILITY_LABEL[result.eligibility.status]}</p>
+        <p className="text-sm text-gray-500 mb-4">
+          {result.research && result.eligibility.status === 'no_criteria'
+            ? 'Eligibility (CGPA, 10th/12th %, branch) differs by company, so it isn’t checked for a general role. Your academics:'
+            : ELIGIBILITY_LABEL[result.eligibility.status]}
+        </p>
         {result.eligibility.checks.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -147,7 +201,12 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
       <div className={card}>
         <h3 className="font-bold mb-1 flex items-center gap-2"><ListChecks className="w-5 h-5 text-blue-600" /> Skill requirements</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Importance is read from the JD by AI. Scores come from your evidence, never from the AI. The black tick marks the target score.
+          {result.research?.method === 'job_postings'
+            ? 'Importance comes from how many current postings ask for each skill.'
+            : result.research
+              ? 'Importance comes from the CareerLens role profile.'
+              : 'Importance is read from the JD by AI.'}{' '}
+          Scores come from your evidence, never from the AI. The black tick marks the target score.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
@@ -172,6 +231,12 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
                       {r.via === 'implied' && ` · implied by ${r.viaSkill}`}
                       {!r.claimed && r.via === 'none' && ' · not on resume'}
                     </div>
+                    {result.research?.method === 'job_postings' && r.quote && !r.alternatives?.length && (
+                      <div className="text-[11px] text-gray-400">{r.quote.replace(/^In /, 'in ')}</div>
+                    )}
+                    {r.alternatives && r.alternatives.length > 0 && (
+                      <div className="text-[11px] text-gray-400">any one of these is enough</div>
+                    )}
                   </td>
                   <td className="py-2.5 pr-3"><Importance value={r.importance} /></td>
                   <td className="py-2.5 pr-3">

@@ -5,7 +5,7 @@
 // Bump SCORING_VERSION whenever any value in this file changes — stored scores
 // carry the version they were produced with, so old results stay reproducible.
 
-export const SCORING_VERSION = 'v1.2';
+export const SCORING_VERSION = 'v1.3';
 
 /** A piecewise-linear lookup: [rawValue, normalizedScore] pairs, ascending by rawValue. */
 export type PiecewiseTable = readonly (readonly [number, number])[];

@@ -206,6 +206,14 @@ export function allSkillSurfaceForms(): { id: string; form: string }[] {
   return out;
 }
 
+// Aliases that are ordinary English words. In free text they only count in the
+// tech spelling ("REST API" yes, "the rest of" no) or not at all.
+const PROSE_SKIP = new Set(['next', 'networking', 'containers', 'nest', 'torch', 'rag', 'shell']);
+const PROSE_EXACT_CASE: Record<string, string> = {
+  rest: 'REST', react: 'React', express: 'Express', spring: 'Spring', rails: 'Rails', spark: 'Spark',
+  excel: 'Excel', node: 'Node', lambda: 'Lambda', angular: 'Angular', swift: 'Swift', rust: 'Rust', unix: 'Unix',
+};
+
 /** Find canonical skills mentioned in a block of text (word-boundary match). */
 export function findSkillsInText(text: string): Set<string> {
   const found = new Set<string>();
@@ -213,9 +221,12 @@ export function findSkillsInText(text: string): Set<string> {
   for (const { id, form } of allSkillSurfaceForms()) {
     // "Go", "C", "R" are ordinary words in prose; only the LLM/skills list can claim them.
     if (form.length < 3 && /^[a-z]+$/i.test(form)) continue;
-    const escaped = form.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const lower = form.toLowerCase();
+    if (PROSE_SKIP.has(lower)) continue;
+    const exact = PROSE_EXACT_CASE[lower];
+    const escaped = (exact ?? form).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Treat + # . as word characters so "C++" / "C#" / "Node.js" match whole.
-    const re = new RegExp(`(^|[^a-z0-9+#.])${escaped}(?=$|[^a-z0-9+#]|\\.(?:\\s|$))`, 'i');
+    const re = new RegExp(`(^|[^a-zA-Z0-9+#.])${escaped}(?=$|[^a-zA-Z0-9+#]|\\.(?:\\s|$))`, exact ? '' : 'i');
     if (re.test(text)) found.add(id);
   }
   return found;

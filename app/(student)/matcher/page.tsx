@@ -2,16 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Briefcase, Target, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Briefcase, Target, Loader2, ShieldCheck, Sparkles, Globe } from 'lucide-react';
 import type { JobFitResult } from '@/lib/scoring/jobMatch';
 import { JobFitReport } from '@/components/matcher/JobFitReport';
+import { ROLE_CATALOG } from '@/lib/scoring/roles-catalog';
 
 type ProfileState = 'loading' | 'ready' | 'missing' | 'outdated' | 'error';
 
-const MIN_JD_LENGTH = 40;
+const SUGGESTED_ROLES = [
+  ...ROLE_CATALOG.map((r) => r.title),
+  'Android Developer', 'DevOps Engineer', 'Machine Learning Engineer', 'Software Engineer', 'QA Engineer', 'Cloud Engineer',
+].filter((r, i, all) => all.indexOf(r) === i);
 
 export default function JobMatcherPage() {
-  const [jobDescription, setJobDescription] = useState('');
+  const [role, setRole] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<JobFitResult | null>(null);
@@ -25,6 +29,10 @@ export default function JobMatcherPage() {
         const { data } = await res.json();
         if (!data) return setProfileState('missing');
         setProfileState(data.evidence?.inputs?.profile ? 'ready' : 'outdated');
+        // Start from the target role saved on My Profile.
+        const me = await fetch('/api/me').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const target = me?.data?.profile?.targetRole;
+        if (target) setRole((current) => current || target);
       } catch (e) {
         console.error(e);
         setProfileState('error');
@@ -34,7 +42,7 @@ export default function JobMatcherPage() {
 
   const handleMatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (jobDescription.trim().length < MIN_JD_LENGTH) return;
+    if (role.trim().length < 2) return;
 
     setIsAnalyzing(true);
     setError(null);
@@ -44,7 +52,7 @@ export default function JobMatcherPage() {
       const res = await fetch('/api/jobs/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobDescription: jobDescription.trim() }),
+        body: JSON.stringify({ role: role.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Matching failed');
@@ -87,29 +95,47 @@ export default function JobMatcherPage() {
             Job Matcher
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Paste a job description. AI reads the requirements and eligibility criteria and cross-checks them against your resume.
-            Your fit score is calculated from your verified evidence with a fixed formula, so the same evidence and JD always give the same score.
+            Enter the role you&apos;re aiming for. CareerLens reads current job postings for that role, measures how often each skill is asked for,
+            and checks your evidence against it. Your fit score comes from a fixed formula, never from the AI.
           </p>
         </div>
 
         <form onSubmit={handleMatch} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden">
           <div className="p-6">
-            <label className="block text-sm font-semibold mb-2">Paste Job Description</label>
-            <textarea
-              className="w-full h-56 p-4 bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
-              placeholder="Paste the full JD, including requirements and eligibility (CGPA, 10th/12th %, experience, branches)…"
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
+            <label htmlFor="role" className="block text-sm font-semibold mb-2">Job role you&apos;re seeking</label>
+            <input
+              id="role"
+              list="role-suggestions"
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. Backend Developer, Data Analyst, Android Developer"
+              value={role}
+              maxLength={80}
+              onChange={(e) => setRole(e.target.value)}
               required
             />
+            <datalist id="role-suggestions">
+              {SUGGESTED_ROLES.map((r) => <option key={r} value={r} />)}
+            </datalist>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {SUGGESTED_ROLES.slice(0, 8).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`px-3 py-1 rounded-full text-xs border transition-colors ${role === r ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-300 hover:border-blue-400'}`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="px-6 py-4 bg-gray-50 dark:bg-zinc-950/50 border-t border-gray-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
             <span className="text-xs text-gray-500 flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4" /> Matched against your saved evidence
+              <Globe className="w-4 h-4" /> Live job postings <ShieldCheck className="w-4 h-4 ml-2" /> your saved evidence
             </span>
             <button
               type="submit"
-              disabled={isAnalyzing || jobDescription.trim().length < MIN_JD_LENGTH}
+              disabled={isAnalyzing || role.trim().length < 2}
               className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
               {isAnalyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing…</> : <><Target className="w-4 h-4" /> Check My Fit</>}
@@ -120,7 +146,7 @@ export default function JobMatcherPage() {
         {isAnalyzing && (
           <div className="flex items-center gap-3 p-4 rounded-xl bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-900/50 text-sm text-violet-700 dark:text-violet-300">
             <Sparkles className="w-4 h-4 animate-pulse" />
-            Reading the JD, scoring each requirement against your evidence, then writing the cross-validation. This takes about 10 seconds.
+            Reading current {role.trim() || 'role'} postings, measuring each skill&apos;s demand, scoring your evidence against it, then writing the explanation. This takes about 10–20 seconds.
           </div>
         )}
 

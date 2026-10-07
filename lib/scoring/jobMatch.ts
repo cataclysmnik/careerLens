@@ -7,6 +7,7 @@
 // The verdict and every number come from step 2 only.
 
 import { extractJobRequirements } from '@/lib/llm/extract-jd';
+import { researchBrief, type RoleResearch } from '@/lib/jobs/role-research';
 import { generateFitAssessment } from '@/lib/llm/cross-validate';
 import type { FitAssessment, JobRequirements } from '@/lib/llm/schemas';
 import { canonicalizeSkill } from './skill-taxonomy';
@@ -41,9 +42,13 @@ export type JobFitResult = {
   projectNames: string[];
   skillScores: SkillScore[];
   assessment: FitAssessment | null;
+  /** Set when requirements came from researching a role rather than a pasted JD. */
+  research: Pick<RoleResearch, 'role' | 'method' | 'postingCount' | 'frequencies' | 'sourcesTried' | 'fetchedAt'> & {
+    postings: RoleResearch['postings'];
+  } | null;
   ai: {
     enabled: boolean;
-    jdParsedBy: 'llm' | 'keywords';
+    jdParsedBy: 'llm' | 'keywords' | 'job_postings' | 'role_catalog';
     assessment: 'llm' | 'unavailable';
     profileSource: 'llm' | 'fallback';
     errors: string[];
@@ -106,13 +111,54 @@ export async function analyzeJobFit(
   jobDescription: string,
   opts: { explain?: boolean } = {}
 ): Promise<JobFitResult> {
-  const explain = opts.explain ?? true;
-  const errors: string[] = [];
-
   // 1. Interpret the JD.
   const jd = await extractJobRequirements(jobDescription);
-  if (jd.ai.error) errors.push(`JD parsing: ${jd.ai.error}`);
-  const reqs = toRoleRequirements(jd.requirements);
+  return scoreJobFit(inputs, jd.requirements, {
+    explain: opts.explain ?? true,
+    explainText: jobDescription,
+    aiEnabled: jd.ai.enabled,
+    parsedBy: jd.ai.used ? 'llm' : 'keywords',
+    errors: jd.ai.error ? [`JD parsing: ${jd.ai.error}`] : [],
+    research: null,
+  });
+}
+
+/** Fit against a role's requirements measured from current job postings (lib/jobs/role-research). */
+export async function analyzeRoleFit(inputs: EvidenceInputs, research: RoleResearch, opts: { explain?: boolean } = {}): Promise<JobFitResult> {
+  return scoreJobFit(inputs, research.requirements, {
+    explain: opts.explain ?? true,
+    explainText: researchBrief(research),
+    aiEnabled: true,
+    parsedBy: research.method,
+    errors: [],
+    research: {
+      role: research.role,
+      method: research.method,
+      postingCount: research.postingCount,
+      frequencies: research.frequencies,
+      sourcesTried: research.sourcesTried,
+      fetchedAt: research.fetchedAt,
+      postings: research.postings.slice(0, 12),
+    },
+  });
+}
+
+async function scoreJobFit(
+  inputs: EvidenceInputs,
+  requirements: JobRequirements,
+  opts: {
+    explain: boolean;
+    /** What the explanation step reads as "the job": the JD, or a research brief. */
+    explainText: string;
+    aiEnabled: boolean;
+    parsedBy: JobFitResult['ai']['jdParsedBy'];
+    errors: string[];
+    research: JobFitResult['research'];
+  }
+): Promise<JobFitResult> {
+  const { explain, errors } = opts;
+  const jd = { requirements };
+  const reqs = toRoleRequirements(requirements);
 
   // 2. Measure + calculate.
   const sp = computeSkillProfile(inputs);
@@ -164,9 +210,10 @@ export async function analyzeJobFit(
     projectNames: inputs.profile.projects.map((p) => p.name),
     skillScores: sp.skills,
     assessment: null,
+    research: opts.research,
     ai: {
-      enabled: jd.ai.enabled,
-      jdParsedBy: jd.ai.used ? 'llm' : 'keywords',
+      enabled: opts.aiEnabled,
+      jdParsedBy: opts.parsedBy,
       assessment: 'unavailable',
       profileSource: inputs.profile.source,
       errors,
@@ -174,9 +221,9 @@ export async function analyzeJobFit(
   };
 
   // 3. Explain. Runs after every number is fixed; its output can't change them.
-  if (explain && jd.ai.enabled) {
+  if (explain && opts.aiEnabled) {
     try {
-      result.assessment = await generateFitAssessment(inputs.profile, jobDescription, result);
+      result.assessment = await generateFitAssessment(inputs.profile, opts.explainText, result);
       result.ai.assessment = 'llm';
     } catch (e) {
       errors.push(`Assessment: ${e instanceof Error ? e.message : 'failed'}`);
