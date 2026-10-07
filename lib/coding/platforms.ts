@@ -56,6 +56,9 @@ const blank = (platform: CodingPlatform, handle: string) => ({
   topics: [] as string[],
   badges: [] as { name: string; stars: number }[],
   certificates: [] as string[],
+  languageStats: [] as { name: string; solved: number }[],
+  acceptanceRate: null as number | null,
+  lastActiveAt: null as string | null,
 });
 
 async function leetcode(handle: string): Promise<Omit<CodingPlatformStats, 'score'>> {
@@ -66,11 +69,12 @@ async function leetcode(handle: string): Promise<Omit<CodingPlatformStats, 'scor
       query: `query($u: String!) {
         matchedUser(username: $u) {
           username
-          submitStatsGlobal { acSubmissionNum { difficulty count } }
+          submitStatsGlobal { acSubmissionNum { difficulty count submissions } totalSubmissionNum { difficulty count submissions } }
           languageProblemCount { languageName problemsSolved }
           tagProblemCounts { advanced { tagName problemsSolved } intermediate { tagName problemsSolved } fundamental { tagName problemsSolved } }
         }
         userContestRanking(username: $u) { rating attendedContestsCount topPercentage }
+        recentAcSubmissionList(username: $u, limit: 1) { timestamp }
       }`,
       variables: { u: handle },
     }),
@@ -80,9 +84,14 @@ async function leetcode(handle: string): Promise<Omit<CodingPlatformStats, 'scor
   const user = data?.matchedUser;
   if (!user) throw notFound('leetcode', handle);
 
-  const ac = Object.fromEntries(
-    (user.submitStatsGlobal?.acSubmissionNum ?? []).map((a: { difficulty: string; count: number }) => [a.difficulty, a.count])
-  );
+  type Stat = { difficulty: string; count: number; submissions: number };
+  const acStats: Stat[] = user.submitStatsGlobal?.acSubmissionNum ?? [];
+  const ac = Object.fromEntries(acStats.map((a) => [a.difficulty, a.count]));
+  const acSubs = acStats.find((a) => a.difficulty === 'All')?.submissions ?? 0;
+  const totalSubs = (user.submitStatsGlobal?.totalSubmissionNum ?? []).find((a: Stat) => a.difficulty === 'All')?.submissions ?? 0;
+  const lastAc = Number(data.recentAcSubmissionList?.[0]?.timestamp);
+  type LangCount = { languageName: string; problemsSolved: number };
+  const langs: LangCount[] = [...(user.languageProblemCount ?? [])].sort((a: LangCount, b: LangCount) => b.problemsSolved - a.problemsSolved);
   const tags = Object.values(user.tagProblemCounts ?? {}).flat() as { tagName: string; problemsSolved: number }[];
   const contest = data.userContestRanking;
 
@@ -93,11 +102,11 @@ async function leetcode(handle: string): Promise<Omit<CodingPlatformStats, 'scor
     rating: contest?.attendedContestsCount ? Math.round(contest.rating) : null,
     rank: contest?.attendedContestsCount ? `Top ${contest.topPercentage}%` : null,
     contests: contest?.attendedContestsCount ?? 0,
-    languages: [...(user.languageProblemCount ?? [])]
-      .sort((a: { problemsSolved: number }, b: { problemsSolved: number }) => b.problemsSolved - a.problemsSolved)
-      .slice(0, 3)
-      .map((l: { languageName: string }) => l.languageName),
+    languages: langs.slice(0, 3).map((l) => l.languageName),
     topics: tags.sort((a, b) => b.problemsSolved - a.problemsSolved).slice(0, 6).map((t) => t.tagName),
+    languageStats: langs.map((l) => ({ name: l.languageName, solved: l.problemsSolved })),
+    acceptanceRate: totalSubs > 0 ? Math.round((acSubs / totalSubs) * 1000) / 1000 : null,
+    lastActiveAt: lastAc ? new Date(lastAc * 1000).toISOString() : null,
   };
 }
 
@@ -114,24 +123,40 @@ async function codeforces(handle: string): Promise<Omit<CodingPlatformStats, 'sc
   ]);
   const contests = ratingRes.ok ? ((await ratingRes.json()).result?.length ?? null) : null;
 
-  type Submission = { verdict: string; programmingLanguage: string; problem: { contestId?: number; problemsetName?: string; index: string; tags: string[] } };
+  type Submission = { verdict: string; programmingLanguage: string; creationTimeSeconds: number; problem: { contestId?: number; problemsetName?: string; index: string; tags: string[]; rating?: number } };
   const submissions: Submission[] = statusRes.ok ? ((await statusRes.json()).result ?? []) : [];
   const solved = new Map<string, Submission>();
   submissions
     .filter((s) => s.verdict === 'OK')
     .forEach((s) => solved.set(`${s.problem.contestId ?? s.problem.problemsetName}-${s.problem.index}`, s));
   const solvedList = [...solved.values()];
+  // "GNU C++17 (64)" -> "C++", "Python 3" -> "Python"
+  const languageOf = (s: Submission) => s.programmingLanguage.replace(/^GNU\s+|^MS\s+/, '').replace(/[\s\d(].*$/, '').replace(/^G?C\+\+.*/, 'C++');
+  const perLanguage = new Map<string, number>();
+  solvedList.forEach((s) => perLanguage.set(languageOf(s), (perLanguage.get(languageOf(s)) ?? 0) + 1));
+  // Problem rating stands in for difficulty: under 1200 easy, 1200–1799 medium, 1800+ hard.
+  const difficulty = { easy: 0, medium: 0, hard: 0 };
+  solvedList.forEach((s) => {
+    const r = s.problem.rating ?? 0;
+    if (r >= 1800) difficulty.hard++;
+    else if (r >= 1200) difficulty.medium++;
+    else difficulty.easy++;
+  });
+  const latest = submissions.reduce((max, s) => Math.max(max, s.creationTimeSeconds ?? 0), 0);
 
   return {
     ...blank('codeforces', user.handle),
     problemsSolved: statusRes.ok ? solvedList.length : null,
+    difficulty: statusRes.ok ? difficulty : null,
     rating: user.rating ?? null,
     maxRating: user.maxRating ?? null,
     rank: user.rank ? user.rank.replace(/\b\w/g, (c: string) => c.toUpperCase()) : null,
     contests,
-    // "GNU C++17 (64)" -> "C++", "Python 3" -> "Python"
-    languages: topN(solvedList, (s) => s.programmingLanguage.replace(/^GNU\s+|^MS\s+/, '').replace(/[\s\d(].*$/, '').replace(/^G?C\+\+.*/, 'C++'), 3),
+    languages: topN(solvedList, languageOf, 3),
     topics: topN(solvedList.flatMap((s) => s.problem.tags.map((tag) => ({ tag }))), (t) => t.tag, 6),
+    languageStats: [...perLanguage.entries()].sort((a, b) => b[1] - a[1]).map(([name, solved]) => ({ name, solved })),
+    acceptanceRate: submissions.length ? Math.round((submissions.filter((s) => s.verdict === 'OK').length / submissions.length) * 1000) / 1000 : null,
+    lastActiveAt: latest ? new Date(latest * 1000).toISOString() : null,
   };
 }
 
@@ -189,6 +214,8 @@ async function hackerrank(handle: string): Promise<Omit<CodingPlatformStats, 'sc
     languages: earned.filter((b) => /^(Python|Java|C\+\+|C|Ruby|JavaScript|Go|Kotlin|SQL)$/i.test(b.badge_name)).slice(0, 3).map((b) => b.badge_name),
     badges: earned.map((b) => ({ name: b.badge_name, stars: b.stars })),
     certificates,
+    // Language/domain badges count problems solved in that track (e.g. Python, SQL, Java).
+    languageStats: badges.filter((b) => b.solved > 0).map((b) => ({ name: b.badge_name, solved: b.solved })),
   };
 }
 
@@ -217,5 +244,6 @@ const FETCHERS: Record<CodingPlatform, (handle: string) => Promise<Omit<CodingPl
 
 export async function fetchCodingProfile(platform: CodingPlatform, handle: string): Promise<CodingPlatformStats> {
   const stats = await FETCHERS[platform](handle);
-  return { ...stats, score: scorePlatform(stats) };
+  const { score, breakdown } = scorePlatform(stats);
+  return { ...stats, score, breakdown };
 }

@@ -63,7 +63,7 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL(home, req.nextUrl));
   }
 
-  const isStudentArea = ["/dashboard", "/onboarding", "/matcher", "/profile"].some((p) =>
+  const isStudentArea = ["/dashboard", "/onboarding", "/matcher", "/profile", "/jobs"].some((p) =>
     pathname.startsWith(p)
   );
   const isCompanyArea = pathname.startsWith("/company");

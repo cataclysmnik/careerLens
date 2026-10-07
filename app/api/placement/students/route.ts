@@ -4,6 +4,9 @@ import { prisma } from "@/lib/db/prisma";
 import type { ScoringResult } from "@/lib/scoring/engine";
 import type { UnifiedEvidence } from "@/lib/evidence/aggregator";
 import { readinessTier } from "@/lib/readiness";
+import { Prisma } from "@prisma/client";
+import { currentScoring } from "@/lib/evidence/student-evidence";
+import { VERIFICATION_LABEL } from "@/lib/scoring/normalize";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -23,8 +26,14 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
   });
 
+  // Re-score reports from an older scoring version so every student is compared on the same model.
+  const stale: Promise<unknown>[] = [];
   const rows = students.map((s) => {
-    const scoring = s.evidence?.scoring as unknown as ScoringResult | undefined;
+    const current = s.evidence ? currentScoring(s.evidence.evidence, s.evidence.scoring, s.profile?.targetRole ?? null) : null;
+    if (current?.changed) {
+      stale.push(prisma.studentEvidence.update({ where: { userId: s.id }, data: { scoring: current.scoring as unknown as Prisma.InputJsonValue } }));
+    }
+    const scoring = (current?.scoring ?? undefined) as ScoringResult | undefined;
     const evidence = s.evidence?.evidence as unknown as UnifiedEvidence | undefined;
     const overallScore = scoring?.overallScore ?? null;
     return {
@@ -64,7 +73,15 @@ export async function GET(req: Request) {
       categories: scoring?.categories ?? [],
       strengths: scoring?.strengths ?? [],
       gaps: scoring?.gaps ?? [],
-      skills: (evidence?.skills ?? []).map((sk) => ({ name: sk.name, strength: sk.strength })),
+      // Scored skills (v1.3+) carry proof; older reports fall back to the legacy list.
+      skills: scoring?.skillScores?.length
+        ? scoring.skillScores.map((sk) => ({
+            name: sk.label,
+            strength: `${VERIFICATION_LABEL[sk.verification]} ${sk.score}`,
+            proven: sk.proof ? sk.proven : null,
+            proof: (sk.proof ?? []).map((p) => p.label),
+          }))
+        : (evidence?.skills ?? []).map((sk) => ({ name: sk.name, strength: sk.strength, proven: null, proof: [] as string[] })),
       hasGithub: evidence?.hasGithub ?? false,
       hasPortfolio: evidence?.hasPortfolio ?? false,
       updatedAt: s.evidence?.updatedAt ?? null,
@@ -79,5 +96,6 @@ export async function GET(req: Request) {
     return true;
   });
 
+  await Promise.all(stale);
   return NextResponse.json({ data: filtered });
 }

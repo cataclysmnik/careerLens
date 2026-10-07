@@ -5,7 +5,7 @@
 // Bump SCORING_VERSION whenever any value in this file changes — stored scores
 // carry the version they were produced with, so old results stay reproducible.
 
-export const SCORING_VERSION = 'v1.3';
+export const SCORING_VERSION = 'v1.3.1';
 
 /** A piecewise-linear lookup: [rawValue, normalizedScore] pairs, ascending by rawValue. */
 export type PiecewiseTable = readonly (readonly [number, number])[];
@@ -51,7 +51,7 @@ export const TESTING_MILESTONES = {
   testConfigWithCi: 85,
 } as const;
 
-/** Months of professional experience using a skill -> score. */
+/** Months of professional experience (or using a skill) -> score. */
 export const EXPERIENCE_MONTHS_TABLE: PiecewiseTable = [
   [0, 0], [1, 40], [3, 60], [6, 75], [12, 90], [24, 100],
 ];
@@ -80,13 +80,33 @@ export const SKILL_COMPONENT_WEIGHTS: Record<SkillComponentKey, number> = {
 };
 
 /**
- * Components CareerLens has no way to measure yet. Like components whose source
- * the student didn't provide (no GitHub, no portfolio), they are left out of the
- * denominator — weights re-normalized over the rest — instead of counting as 0
- * (§29–30: missing evidence is not proof of no skill). Unlike those, they don't
- * lower confidence, since no student can supply them yet.
+ * Components CareerLens can't measure for most students yet. They are left out
+ * of the denominator (weights re-normalized over the rest) unless measured —
+ * e.g. Assessment counts only when a verified HackerRank certificate covers the
+ * skill. Proof sources the student didn't link (no GitHub, no portfolio) are
+ * NOT left out: they count as 0, so a skill without proof can't score high.
  */
 export const UNOFFERED_SKILL_COMPONENTS: readonly SkillComponentKey[] = ['assessment'];
+
+/**
+ * A skill is "proven" only when an external, checkable source shows it: a
+ * GitHub repo, the portfolio site, a coding platform, or a verified
+ * certificate. Resume text (skills list, projects, experience, self-listed
+ * certifications) is a claim. Unproven skills are scaled down and capped so
+ * they can't rise above "Weak" (§8 bands).
+ */
+export const UNPROVEN_SKILL = { factor: 0.5, cap: 40 } as const;
+
+/** Fewer problems than this in a language isn't proof of it (one stray submission proves little). */
+export const CODING_LANGUAGE_MIN_SOLVED = 5;
+
+/** Problems solved in a language on LeetCode / Codeforces / HackerRank -> code evidence for that language. */
+export const CODING_LANGUAGE_SOLVED_TABLE: PiecewiseTable = [
+  [0, 0], [5, 30], [25, 50], [75, 70], [150, 85], [300, 100],
+];
+
+/** Verified HackerRank skill certificate -> Assessment component (§5). */
+export const CERTIFICATE_LEVEL_SCORE = { basic: 60, intermediate: 80, advanced: 100, unspecified: 60 } as const;
 
 /** Breadth bonus for each extra project/role that uses a skill, capped. */
 export const PROJECT_BREADTH_BONUS = { perExtra: 5, max: 15 } as const;
@@ -203,29 +223,87 @@ export type ReadinessDimensionKey =
   | 'technical'
   | 'project'
   | 'roleAlignment'
+  | 'experience'
   | 'interview'
-  | 'consistency'
-  | 'problemSolving';
+  | 'consistency';
 
-// Problem Solving (coding platforms) takes 10%; the others keep their v1.0
-// proportions (×0.9), so a profile without coding platforms scores the same.
+// §20. Academics (§17, §22) and the coding score (§15) are reported as
+// separate metrics; coding results also prove the DSA and language skills that
+// feed Technical Competency and Role Alignment.
 export const READINESS_WEIGHTS: Record<ReadinessDimensionKey, number> = {
-  technical: 0.315,
-  project: 0.225,
-  roleAlignment: 0.18,
-  interview: 0.09,
-  consistency: 0.09,
-  problemSolving: 0.10,
+  technical: 0.30,
+  project: 0.20,
+  roleAlignment: 0.20,
+  experience: 0.10,
+  interview: 0.10,
+  consistency: 0.10,
 };
 
 export const READINESS_DIMENSION_LABEL: Record<ReadinessDimensionKey, string> = {
   technical: 'Technical Competency',
   project: 'Project Evidence',
   roleAlignment: 'Role Alignment',
+  experience: 'Experience',
   interview: 'Interview Readiness',
   consistency: 'Consistency',
-  problemSolving: 'Problem Solving',
 };
+
+// ---------------------------------------------------------------------------
+// Experience (§16)
+// ---------------------------------------------------------------------------
+
+export const EXPERIENCE_WEIGHTS = {
+  relevantExperience: 0.30,
+  technicalRelevance: 0.30,
+  responsibility: 0.20,
+  productionExposure: 0.20,
+} as const;
+
+/** Distinct technical skills used in a role -> technical relevance of that role. */
+export const ROLE_TECH_SKILLS_TABLE: PiecewiseTable = [
+  [0, 0], [1, 40], [2, 70], [3, 100],
+];
+/** Distinct ownership verbs (led, designed, owned…) in role descriptions -> responsibility. */
+export const OWNERSHIP_SIGNALS_TABLE: PiecewiseTable = [
+  [0, 0], [1, 50], [2, 75], [3, 100],
+];
+/** Distinct production signals (deployed, users, live…) in role descriptions -> production exposure. */
+export const PRODUCTION_SIGNALS_TABLE: PiecewiseTable = [
+  [0, 0], [1, 60], [2, 100],
+];
+
+// ---------------------------------------------------------------------------
+// Coding / problem solving (§15)
+// ---------------------------------------------------------------------------
+
+export const CODING_WEIGHTS = {
+  problemsSolved: 0.30,
+  difficultyDepth: 0.25,
+  contestPerformance: 0.20,
+  recentActivity: 0.15,
+  accuracy: 0.10,
+} as const;
+
+/** Total problems solved -> score. */
+export const CODING_SOLVED_TABLE: PiecewiseTable = [
+  [0, 0], [50, 30], [150, 55], [300, 75], [500, 90], [800, 100],
+];
+/** Harder problems: medium + 2 × hard (Codeforces: rated 1200–1799 + 2 × rated 1800+) -> score. */
+export const CODING_DEPTH_TABLE: PiecewiseTable = [
+  [0, 0], [20, 25], [75, 50], [150, 70], [300, 90], [450, 100],
+];
+/** Contest rating per platform -> score. The best platform counts. */
+export const CONTEST_RATING_TABLES: Record<'leetcode' | 'codeforces' | 'codechef', PiecewiseTable> = {
+  leetcode: [[1200, 0], [1500, 40], [1700, 60], [1900, 80], [2200, 100]],
+  codeforces: [[800, 0], [1200, 40], [1400, 55], [1600, 70], [1900, 85], [2100, 100]],
+  codechef: [[1200, 0], [1400, 30], [1600, 50], [1800, 70], [2000, 85], [2200, 100]],
+};
+/** Accepted ÷ total submissions -> score. */
+export const CODING_ACCURACY_TABLE: PiecewiseTable = [
+  [0, 0], [0.2, 30], [0.35, 60], [0.5, 80], [0.65, 100],
+];
+/** Coding score bands for the Strong / Moderate / Weak label. */
+export const CODING_STRENGTH_THRESHOLDS = { strong: 70, moderate: 40 } as const;
 
 // ---------------------------------------------------------------------------
 // Role fit, gaps and priority (§12, §13, §18, §19)
@@ -298,4 +376,6 @@ assertWeightsSumToOne('PROJECT_DIMENSION', PROJECT_DIMENSION_WEIGHTS);
 assertWeightsSumToOne('CONSISTENCY', CONSISTENCY_WEIGHTS);
 assertWeightsSumToOne('INTERVIEW', INTERVIEW_WEIGHTS);
 assertWeightsSumToOne('READINESS', READINESS_WEIGHTS);
+assertWeightsSumToOne('EXPERIENCE', EXPERIENCE_WEIGHTS);
+assertWeightsSumToOne('CODING', CODING_WEIGHTS);
 assertWeightsSumToOne('TOP_PROJECT', Object.fromEntries(TOP_PROJECT_WEIGHTS.map((w, i) => [String(i), w])));

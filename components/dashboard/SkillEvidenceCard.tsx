@@ -1,13 +1,56 @@
 import React from 'react';
-import { ShieldCheck, GitFork } from 'lucide-react';
-import type { SkillScore } from '@/lib/scoring/skill-score';
+import { ShieldCheck, GitFork, Globe, Trophy, Award, ShieldOff, ExternalLink } from 'lucide-react';
+import type { ProofSource, SkillScore } from '@/lib/scoring/skill-score';
+import { UNPROVEN_SKILL } from '@/lib/scoring/config';
 import { VerificationBadge, ScoreBar } from '@/components/scoring/badges';
 
 const STATUS_NOTE: Record<string, string> = {
-  source_unavailable: 'not provided',
   not_offered: 'not offered yet',
-  none_found: 'none found',
 };
+
+const PROOF_ICON: Record<ProofSource['kind'], typeof GitFork> = {
+  github: GitFork,
+  portfolio: Globe,
+  coding: Trophy,
+  certificate: Award,
+};
+
+/** Where the skill is proven (GitHub, portfolio, coding platforms, certificates), or "No proof". */
+export function ProofChips({ skill }: { skill: SkillScore }) {
+  // Reports scored before v1.3 have no proof data.
+  if (!skill.proof) return null;
+  if (!skill.proven) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/50"
+        title={skill.claimed ? 'Only claimed on the resume — no GitHub, portfolio, coding platform or certificate shows it' : 'No external source shows it'}
+      >
+        <ShieldOff className="w-3 h-3" /> No proof
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {skill.proof.map((p, i) => {
+        const Icon = PROOF_ICON[p.kind];
+        const chip = (
+          <>
+            <Icon className="w-3 h-3" /> {p.label}
+            {p.url && <ExternalLink className="w-2.5 h-2.5 opacity-60" />}
+          </>
+        );
+        const cls = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-900/50';
+        return p.url ? (
+          <a key={i} href={p.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`${cls} hover:border-green-400`} title={p.detail}>
+            {chip}
+          </a>
+        ) : (
+          <span key={i} className={cls} title={p.detail}>{chip}</span>
+        );
+      })}
+    </span>
+  );
+}
 
 /** One skill: score, verification band, confidence, and the §8 component breakdown. */
 export function SkillEvidenceCard({ skill, githubUser }: { skill: SkillScore; githubUser?: string | null }) {
@@ -22,17 +65,23 @@ export function SkillEvidenceCard({ skill, githubUser }: { skill: SkillScore; gi
           <span className="text-2xl font-bold tabular-nums w-10">{skill.score}</span>
           <div className="flex-1"><ScoreBar score={skill.score} /></div>
         </div>
+        <div className="mb-3"><ProofChips skill={skill} /></div>
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <span className="flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-blue-500" /> Confidence {Math.round(skill.confidence * 100)}%
           </span>
-          <span>{skill.sources.length ? `Seen in ${skill.sources.join(', ')}` : 'No sources'}</span>
+          <span>{skill.claimed ? 'Claimed on resume' : 'Not on resume'}</span>
         </div>
-        {skill.claimGap && (
+        {skill.proof && !skill.proven ? (
+          <p className="mt-3 text-xs text-red-700 dark:text-red-400">
+            No GitHub repo, portfolio, coding platform or certificate shows this skill, so it counts for less
+            {skill.claimed ? ' — a resume claim alone isn’t proof' : ''}.
+          </p>
+        ) : skill.claimGap ? (
           <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
             Claimed on your resume, but there isn’t enough observable evidence yet to verify it.
           </p>
-        )}
+        ) : null}
       </summary>
 
       <div className="px-5 pb-5 border-t border-gray-100 dark:border-zinc-800">
@@ -60,15 +109,38 @@ export function SkillEvidenceCard({ skill, githubUser }: { skill: SkillScore; gi
                 <td className="py-1.5 text-right tabular-nums font-medium">{c.effectiveWeight === 0 ? '—' : c.weighted.toFixed(1)}</td>
               </tr>
             ))}
-            <tr className="border-t border-gray-200 dark:border-zinc-700 font-semibold">
-              <td className="pt-2" colSpan={3}>Evidence score</td>
-              <td className="pt-2 text-right tabular-nums">{skill.exactScore.toFixed(1)}</td>
-            </tr>
+            {skill.unprovenFrom != null ? (
+              <>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="pt-2" colSpan={3}>Weighted sum</td>
+                  <td className="pt-2 text-right tabular-nums">{skill.unprovenFrom.toFixed(1)}</td>
+                </tr>
+                <tr className="text-red-700 dark:text-red-400">
+                  <td className="pt-1" colSpan={3}>No proof: × {UNPROVEN_SKILL.factor}, capped at {UNPROVEN_SKILL.cap}</td>
+                  <td className="pt-1 text-right tabular-nums">{skill.exactScore.toFixed(1)}</td>
+                </tr>
+              </>
+            ) : (
+              <tr className="border-t border-gray-200 dark:border-zinc-700 font-semibold">
+                <td className="pt-2" colSpan={3}>Evidence score</td>
+                <td className="pt-2 text-right tabular-nums">{skill.exactScore.toFixed(1)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
         <p className="mt-2 text-[11px] text-gray-400">
-          Missing sources are left out of the weights (not scored as 0) and lower the confidence instead.
+          A proof source you haven’t linked (GitHub, portfolio) counts as 0. Assessment only counts when a verified certificate covers the skill.
         </p>
+
+        {skill.proof?.length > 0 && (
+          <ul className="mt-4 space-y-1">
+            {skill.proof.map((p, i) => (
+              <li key={i} className="text-xs text-gray-600 dark:text-gray-300">
+                <span className="font-semibold">{p.label}:</span> {p.detail}
+              </li>
+            ))}
+          </ul>
+        )}
 
         {skill.evidence.repos.length > 0 && (
           <ul className="flex flex-wrap gap-2 mt-4">

@@ -3,12 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, ShieldCheck, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldCheck, Bell, ClipboardList } from 'lucide-react';
 import { SidebarUserCard } from './SidebarUserCard';
 
 const navItems = [
   { name: 'Overview', href: '/placement', icon: LayoutDashboard },
   { name: 'Students', href: '/placement/students', icon: Users },
+  { name: 'Job Listings', href: '/placement/jobs', icon: ClipboardList },
   { name: 'Approvals', href: '/placement/approvals', icon: ShieldCheck },
   { name: 'Notifications', href: '/placement/notifications', icon: Bell },
 ];

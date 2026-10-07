@@ -9,6 +9,7 @@
 import { extractJobRequirements } from '@/lib/llm/extract-jd';
 import { researchBrief, type RoleResearch } from '@/lib/jobs/role-research';
 import { generateFitAssessment } from '@/lib/llm/cross-validate';
+import { isLLMEnabled } from '@/lib/llm/groq';
 import type { FitAssessment, JobRequirements } from '@/lib/llm/schemas';
 import { canonicalizeSkill } from './skill-taxonomy';
 import { computeRoleFit, recommendActions, type NextAction, type RequirementResult, type RoleFitResult } from './role-fit';
@@ -111,56 +112,81 @@ export async function analyzeJobFit(
   jobDescription: string,
   opts: { explain?: boolean } = {}
 ): Promise<JobFitResult> {
+  const explain = opts.explain ?? true;
+
   // 1. Interpret the JD.
   const jd = await extractJobRequirements(jobDescription);
-  return scoreJobFit(inputs, jd.requirements, {
-    explain: opts.explain ?? true,
-    explainText: jobDescription,
-    aiEnabled: jd.ai.enabled,
-    parsedBy: jd.ai.used ? 'llm' : 'keywords',
-    errors: jd.ai.error ? [`JD parsing: ${jd.ai.error}`] : [],
-    research: null,
-  });
+  const result = computeJobFit(inputs, jd.requirements, { enabled: jd.ai.enabled, used: jd.ai.used });
+  if (jd.ai.error) result.ai.errors.push(`JD parsing: ${jd.ai.error}`);
+
+  // 3. Explain. Runs after every number is fixed; its output can't change them.
+  // The explanation model runs on Groq; without a Groq key the scores stand on their own.
+  if (explain && isLLMEnabled()) {
+    try {
+      result.assessment = await generateFitAssessment(inputs.profile, jobDescription, result);
+      result.ai.assessment = 'llm';
+    } catch (e) {
+      result.ai.errors.push(`Assessment: ${e instanceof Error ? e.message : 'failed'}`);
+    }
+  }
+  return result;
 }
 
 /** Fit against a role's requirements measured from current job postings (lib/jobs/role-research). */
-export async function analyzeRoleFit(inputs: EvidenceInputs, research: RoleResearch, opts: { explain?: boolean } = {}): Promise<JobFitResult> {
-  return scoreJobFit(inputs, research.requirements, {
-    explain: opts.explain ?? true,
-    explainText: researchBrief(research),
-    aiEnabled: true,
-    parsedBy: research.method,
-    errors: [],
-    research: {
-      role: research.role,
-      method: research.method,
-      postingCount: research.postingCount,
-      frequencies: research.frequencies,
-      sourcesTried: research.sourcesTried,
-      fetchedAt: research.fetchedAt,
-      smallSample: research.smallSample,
-      aiReadPostings: research.aiReadPostings,
-      postings: research.postings.slice(0, 12),
-    },
-  });
+export async function analyzeRoleFit(
+  inputs: EvidenceInputs,
+  research: RoleResearch,
+  opts: { explain?: boolean } = {}
+): Promise<JobFitResult> {
+  const explain = opts.explain ?? true;
+  const result = computeJobFit(
+    inputs,
+    research.requirements,
+    { enabled: true, used: true },
+    {
+      parsedBy: research.method,
+      research: {
+        role: research.role,
+        method: research.method,
+        postingCount: research.postingCount,
+        frequencies: research.frequencies,
+        sourcesTried: research.sourcesTried,
+        fetchedAt: research.fetchedAt,
+        smallSample: research.smallSample,
+        aiReadPostings: research.aiReadPostings,
+        postings: research.postings.slice(0, 12),
+      },
+    }
+  );
+
+  if (explain && isLLMEnabled()) {
+    try {
+      result.assessment = await generateFitAssessment(inputs.profile, researchBrief(research), result);
+      result.ai.assessment = 'llm';
+    } catch (e) {
+      result.ai.errors.push(`Assessment: ${e instanceof Error ? e.message : 'failed'}`);
+    }
+  }
+  return result;
 }
 
-async function scoreJobFit(
+/**
+ * Step 2 alone: score a candidate against requirements already extracted from
+ * a JD (e.g. stored on a job listing). Pure and synchronous — no LLM — so every
+ * applicant to a listing is ranked by exactly the same formula and inputs.
+ */
+export function computeJobFit(
   inputs: EvidenceInputs,
   requirements: JobRequirements,
+  ai: { enabled: boolean; used: boolean },
   opts: {
-    explain: boolean;
-    /** What the explanation step reads as "the job": the JD, or a research brief. */
-    explainText: string;
-    aiEnabled: boolean;
-    parsedBy: JobFitResult['ai']['jdParsedBy'];
-    errors: string[];
-    research: JobFitResult['research'];
-  }
-): Promise<JobFitResult> {
-  const { explain, errors } = opts;
-  const jd = { requirements };
-  const reqs = toRoleRequirements(requirements);
+    parsedBy?: JobFitResult['ai']['jdParsedBy'];
+    research?: JobFitResult['research'];
+  } = {}
+): JobFitResult {
+  const errors: string[] = [];
+  const jd = { requirements, ai };
+  const reqs = toRoleRequirements(jd.requirements);
 
   // 2. Measure + calculate.
   const sp = computeSkillProfile(inputs);
@@ -182,7 +208,7 @@ async function scoreJobFit(
   const required = fit.requirements.filter((r) => r.requirement === 'required');
   const preferred = fit.requirements.filter((r) => r.requirement === 'preferred');
 
-  const result: JobFitResult = {
+  return {
     scoringVersion: SCORING_VERSION,
     job: {
       title: jd.requirements.title,
@@ -212,25 +238,13 @@ async function scoreJobFit(
     projectNames: inputs.profile.projects.map((p) => p.name),
     skillScores: sp.skills,
     assessment: null,
-    research: opts.research,
+    research: opts.research ?? null,
     ai: {
-      enabled: opts.aiEnabled,
-      jdParsedBy: opts.parsedBy,
+      enabled: ai.enabled,
+      jdParsedBy: opts.parsedBy ?? (ai.used ? 'llm' : 'keywords'),
       assessment: 'unavailable',
       profileSource: inputs.profile.source,
       errors,
     },
   };
-
-  // 3. Explain. Runs after every number is fixed; its output can't change them.
-  if (explain && opts.aiEnabled) {
-    try {
-      result.assessment = await generateFitAssessment(inputs.profile, opts.explainText, result);
-      result.ai.assessment = 'llm';
-    } catch (e) {
-      errors.push(`Assessment: ${e instanceof Error ? e.message : 'failed'}`);
-    }
-  }
-
-  return result;
 }

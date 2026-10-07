@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
-import { buildStudentEvidence, CandidateProfileSchema, readInputs, withCodingProfile, type GithubAnalyzeData, type StoredEvidence } from "@/lib/evidence/student-evidence";
+import { buildStudentEvidence, CandidateProfileSchema, currentScoring, readInputs, withCodingProfile, type GithubAnalyzeData, type StoredEvidence } from "@/lib/evidence/student-evidence";
 import type { CodingProfileSummary } from "@/lib/coding/analyzer";
 import type { PortfolioEvidence } from "@/lib/portfolio/analyzer";
 
@@ -103,12 +103,23 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const row = await prisma.studentEvidence.findUnique({
-    where: { userId: session.user.id },
-  });
+  const [row, userProfile] = await Promise.all([
+    prisma.studentEvidence.findUnique({ where: { userId: session.user.id } }),
+    prisma.profile.findUnique({ where: { userId: session.user.id }, select: { targetRole: true } }),
+  ]);
 
   // A student who hasn't run an analysis yet is a normal state, not an error.
+  if (!row) return NextResponse.json({ data: null });
+
+  // Reports from an older scoring version are re-scored from their stored inputs.
+  const { scoring, changed } = currentScoring(row.evidence, row.scoring, userProfile?.targetRole ?? null);
+  if (changed) {
+    await prisma.studentEvidence.update({
+      where: { userId: session.user.id },
+      data: { scoring: scoring as unknown as Prisma.InputJsonValue },
+    });
+  }
   return NextResponse.json({
-    data: row ? { evidence: row.evidence, scoring: row.scoring, updatedAt: row.updatedAt } : null,
+    data: { evidence: row.evidence, scoring, updatedAt: row.updatedAt },
   });
 }

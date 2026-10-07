@@ -11,7 +11,7 @@ import {
   type VerificationLevel,
 } from './config';
 import { round1, verificationLevel } from './normalize';
-import { resolveSkillScore, type SkillScore } from './skill-score';
+import { resolveSkillScore, type ProofSource, type SkillScore } from './skill-score';
 import { skillLabel } from './skill-taxonomy';
 
 export type RoleRequirement = {
@@ -41,6 +41,8 @@ export type RequirementResult = {
   insufficientEvidence: boolean;
   confidence: number;
   claimed: boolean;
+  /** Proof behind the skill that satisfied this requirement; empty = no proof. */
+  proof: ProofSource[];
   gap: number;
   priority: number;
   /** score × importance — this skill's numerator share in the role-fit formula. */
@@ -85,6 +87,7 @@ export function computeRoleFit(reqs: RoleRequirement[], scores: Map<string, Skil
       insufficientEvidence: basis ? basis.insufficientEvidence : true,
       confidence: basis?.confidence ?? 0,
       claimed: resolved.skill?.claimed ?? false,
+      proof: basis?.proof ?? [],
       gap,
       priority: round1(gap * r.importance),
       contribution: round1(score * r.importance),

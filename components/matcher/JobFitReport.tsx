@@ -235,7 +235,7 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
                 );
                 const matched = matchingSkills.find((s) => s.evidence?.repos?.length > 0) ?? matchingSkills[0];
                 const repos = matched?.evidence?.repos ?? [];
-                const hasGithub = repos.length > 0;
+                const hasGithub = repos.length > 0 || r.proof?.some((p) => p.kind === 'github');
 
                 return (
                   <tr key={r.label} className="border-t border-gray-100 dark:border-zinc-800 align-top">
@@ -267,12 +267,14 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <VerificationBadge level={r.verification} insufficient={r.insufficientEvidence} />
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
-                              <GitFork className="w-3 h-3" /> Found in GitHub ({repos.length} {repos.length === 1 ? 'repo' : 'repos'})
+                              <GitFork className="w-3 h-3" /> Found in GitHub ({repos.length > 0 ? `${repos.length} ${repos.length === 1 ? 'repo' : 'repos'}` : 'Verified'})
                             </span>
                           </div>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-xs" title={repos.join(', ')}>
-                            {repos.slice(0, 3).join(', ')}{repos.length > 3 ? ` +${repos.length - 3} more` : ''}
-                          </p>
+                          {repos.length > 0 && (
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-xs" title={repos.join(', ')}>
+                              {repos.slice(0, 3).join(', ')}{repos.length > 3 ? ` +${repos.length - 3} more` : ''}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-0.5">

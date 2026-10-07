@@ -3,6 +3,9 @@
 
 import {
   ACTIVE_MONTHS_TABLE,
+  CERTIFICATE_LEVEL_SCORE,
+  CODING_LANGUAGE_MIN_SOLVED,
+  CODING_LANGUAGE_SOLVED_TABLE,
   CONSISTENCY_WEIGHTS,
   CONTINUATION_MIN_DAYS,
   EXPERIENCE_MONTHS_TABLE,
@@ -13,6 +16,7 @@ import {
   SKILL_COMPONENT_WEIGHTS,
   SOURCE_COUNT_TABLE,
   UNOFFERED_SKILL_COMPONENTS,
+  UNPROVEN_SKILL,
   type SkillComponentKey,
   type VerificationLevel,
 } from './config';
@@ -21,12 +25,23 @@ import { canonicalizeSkill, findSkillsInText, impliedSkills, skillLabel, type Sk
 import { dockerMilestone, repoSignals, testingMilestone, type EvidenceInputs, type RepoSignals } from './evidence-inputs';
 import type { ProjectScore } from './project-score';
 import { experienceMonths, parseResumeDate } from '@/lib/profile/academics';
+import { PLATFORM_INFO, type CodingPlatform } from '@/lib/coding/handles';
 
 export type ComponentStatus =
   | 'measured' // evidence found and normalized
   | 'none_found' // the source was checked and shows nothing for this skill
-  | 'source_unavailable' // the candidate didn't provide the source (no GitHub, no portfolio)
+  | 'source_unavailable' // the candidate didn't provide the source (no GitHub, no portfolio) — counts as 0
   | 'not_offered'; // CareerLens can't measure this yet — excluded from the weights
+
+/** An external, checkable source that shows the skill. Resume text is a claim, not proof. */
+export type ProofSource = {
+  kind: 'github' | 'portfolio' | 'coding' | 'certificate';
+  /** e.g. "GitHub", "LeetCode", "HackerRank certificate". */
+  label: string;
+  /** e.g. "3 repos: api, web", "120 problems in Python", "Python (Basic)". */
+  detail: string;
+  url: string | null;
+};
 
 export type ScoreComponent = {
   key: SkillComponentKey;
@@ -61,6 +76,11 @@ export type SkillScore = {
   claimed: boolean;
   /** Claimed on the resume but weakly evidenced (§10). */
   claimGap: boolean;
+  /** External sources that prove the skill; empty means "No proof". */
+  proof: ProofSource[];
+  proven: boolean;
+  /** Set when the score was scaled down for having no proof: the weighted sum before the adjustment. */
+  unprovenFrom: number | null;
   components: ScoreComponent[];
   sources: string[];
   evidence: { projects: string[]; roles: string[]; repos: string[] };
@@ -80,6 +100,9 @@ const OFFERED_WEIGHT_SUM = (Object.keys(SKILL_COMPONENT_WEIGHTS) as SkillCompone
   .filter((k) => !UNOFFERED_SKILL_COMPONENTS.includes(k))
   .reduce((a, k) => a + SKILL_COMPONENT_WEIGHTS[k], 0);
 
+type CodingLanguageEvidence = { platform: CodingPlatform; handle: string; url: string; name: string; solved: number; lastActiveAt: Date | null };
+type CertificateEvidence = { name: string; level: keyof typeof CERTIFICATE_LEVEL_SCORE; url: string };
+
 type Ctx = {
   inputs: EvidenceInputs;
   asOf: Date;
@@ -89,7 +112,42 @@ type Ctx = {
   roleSkills: Set<string>[];
   claimed: Map<string, { listed: boolean; name: string; kind: 'technical' | 'soft' | 'domain' | null }>;
   portfolioSkills: Set<string> | null;
+  /** Problems solved per skill on coding platforms (languages, SQL tracks…). */
+  codingLanguages: Map<string, CodingLanguageEvidence[]>;
+  /** Verified HackerRank certificates per skill. */
+  certificates: Map<string, CertificateEvidence[]>;
 };
+
+// HackerRank names its general certificate "Problem Solving".
+const CERTIFICATE_SKILL_ALIASES: Record<string, string> = { 'problem solving': 'dsa' };
+
+function codingEvidence(inputs: EvidenceInputs) {
+  const languages = new Map<string, CodingLanguageEvidence[]>();
+  const certificates = new Map<string, CertificateEvidence[]>();
+  for (const p of inputs.coding?.platforms ?? []) {
+    const lastActiveAt = p.lastActiveAt ? new Date(p.lastActiveAt) : null;
+    for (const l of p.languageStats ?? []) {
+      const canon = canonicalizeSkill(l.name);
+      // Only dictionary skills: badge tracks like "30 Days of Code" aren't skills.
+      if (!canon.known || l.solved < CODING_LANGUAGE_MIN_SOLVED) continue;
+      const list = languages.get(canon.id) ?? [];
+      list.push({ platform: p.platform, handle: p.handle, url: p.profileUrl, name: canon.label, solved: l.solved, lastActiveAt });
+      languages.set(canon.id, list);
+    }
+    for (const c of p.certificates) {
+      // "Python (Basic)" -> Python, basic
+      const m = c.match(/^(.*?)\s*(?:\((basic|intermediate|advanced)\))?$/i);
+      const name = (m?.[1] ?? c).trim();
+      const level = (m?.[2]?.toLowerCase() ?? 'unspecified') as CertificateEvidence['level'];
+      const id = CERTIFICATE_SKILL_ALIASES[name.toLowerCase()] ?? (canonicalizeSkill(name).known ? canonicalizeSkill(name).id : null);
+      if (!id) continue;
+      const list = certificates.get(id) ?? [];
+      list.push({ name: c, level, url: p.profileUrl });
+      certificates.set(id, list);
+    }
+  }
+  return { languages, certificates };
+}
 
 export function buildContext(inputs: EvidenceInputs, projectScores: ProjectScore[]): Ctx {
   const { profile } = inputs;
@@ -116,6 +174,10 @@ export function buildContext(inputs: EvidenceInputs, projectScores: ProjectScore
     portfolioSkills: inputs.portfolio
       ? new Set(inputs.portfolio.detectedFrameworks.map((f) => canonicalizeSkill(f).id))
       : null,
+    ...(() => {
+      const { languages, certificates } = codingEvidence(inputs);
+      return { codingLanguages: languages, certificates };
+    })(),
   };
 }
 
@@ -126,6 +188,9 @@ export function candidateSkillIds(ctx: Ctx): Set<string> {
   ctx.roleSkills.forEach((s) => s.forEach((id) => ids.add(id)));
   ctx.repos.forEach((r) => r.skills.forEach((id) => ids.add(id)));
   ctx.portfolioSkills?.forEach((id) => ids.add(id));
+  ctx.codingLanguages.forEach((_, id) => ids.add(id));
+  ctx.certificates.forEach((_, id) => ids.add(id));
+  if (ctx.inputs.coding) ids.add('dsa');
   return ids;
 }
 
@@ -151,8 +216,17 @@ export function scoreSkill(id: string, ctx: Ctx): SkillScore {
   };
 
   // Project evidence (25%) — best project using the skill, best role by duration, plus breadth.
-  if (profile.source === 'fallback') {
-    components.project = { raw: 'Projects not readable without AI extraction', normalized: null, status: 'source_unavailable', source: 'resume' };
+  if (id === 'dsa' && inputs.coding) {
+    // Problem-solving practice on coding platforms is DSA's applied evidence, not resume projects.
+    components.project = {
+      raw: `${inputs.coding.totalSolved} problems solved across ${inputs.coding.platforms.length} platform${inputs.coding.platforms.length > 1 ? 's' : ''}`,
+      normalized: inputs.coding.overallScore,
+      status: 'measured',
+      source: 'coding platforms',
+    };
+  } else if (profile.source === 'fallback') {
+    // Not the student's missing evidence — the resume just couldn't be read — so leave it out.
+    components.project = { raw: 'Projects not readable without AI extraction', normalized: null, status: 'not_offered', source: 'resume' };
   } else {
     const bestProject = projIdx.reduce<{ score: number; name: string } | null>((best, i) => {
       const p = ctx.projectScores[i];
@@ -178,8 +252,26 @@ export function scoreSkill(id: string, ctx: Ctx): SkillScore {
   }
 
   // GitHub / code evidence (30%) — capped repo curve, or milestones for Docker/testing (§4, §7).
+  // Code solved on coding platforms is code evidence too: problems solved in a
+  // language, and the §15 coding score for DSA. The stronger source counts.
+  const codingLangs = ctx.codingLanguages.get(id) ?? [];
+  const codingSolved = codingLangs.reduce((a, l) => a + l.solved, 0);
+  const coding = inputs.coding ?? null;
+  const codingCode: { value: number; raw: string; source: string } | null =
+    id === 'dsa' && coding
+      ? { value: coding.overallScore, raw: `Coding score ${coding.overallScore} (${coding.totalSolved} solved)`, source: 'coding platforms' }
+      : codingSolved > 0
+        ? {
+            value: piecewise(codingSolved, CODING_LANGUAGE_SOLVED_TABLE),
+            raw: codingLangs.map((l) => `${l.solved} solved on ${PLATFORM_INFO[l.platform].label}`).join(', '),
+            source: 'coding platforms',
+          }
+        : null;
+
   if (!inputs.github) {
-    components.github = { raw: 'No GitHub linked', normalized: null, status: 'source_unavailable', source: 'github' };
+    components.github = codingCode
+      ? { raw: codingCode.raw, normalized: round1(codingCode.value), status: 'measured', source: codingCode.source }
+      : { raw: 'No GitHub linked', normalized: 0, status: 'source_unavailable', source: 'github' };
   } else if (id === 'docker' || id === 'testing') {
     const m = id === 'docker' ? dockerMilestone(ctx.repos, false) : testingMilestone(ctx.repos, false);
     components.github = {
@@ -189,17 +281,27 @@ export function scoreSkill(id: string, ctx: Ctx): SkillScore {
       source: `github @${inputs.github.username}`,
     };
   } else {
-    const value = piecewise(repos.length, GITHUB_REPO_TABLE);
+    const repoValue = piecewise(repos.length, GITHUB_REPO_TABLE);
+    const repoRaw = repos.length ? `${repos.length} repo${repos.length > 1 ? 's' : ''}: ${repos.slice(0, 4).map((r) => r.name).join(', ')}${repos.length > 4 ? '…' : ''}` : 'No repos use it';
+    const useCoding = !!codingCode && codingCode.value > repoValue;
     components.github = {
-      raw: repos.length ? `${repos.length} repo${repos.length > 1 ? 's' : ''}: ${repos.slice(0, 4).map((r) => r.name).join(', ')}${repos.length > 4 ? '…' : ''}` : 'No repos use it',
-      normalized: round1(value),
-      status: repos.length ? 'measured' : 'none_found',
-      source: `github @${inputs.github.username}`,
+      raw: useCoding ? codingCode!.raw : repoRaw,
+      normalized: round1(useCoding ? codingCode!.value : repoValue),
+      status: repos.length || codingCode ? 'measured' : 'none_found',
+      source: useCoding ? codingCode!.source : `github @${inputs.github.username}`,
     };
   }
 
-  // Assessment (15%) — no assessment module yet.
-  components.assessment = { raw: 'No assessments on CareerLens yet', normalized: null, status: 'not_offered', source: 'assessment' };
+  // Assessment (15%) — a verified HackerRank skill certificate is a controlled
+  // assessment; without one the component is left out (no assessment module yet).
+  const certs = ctx.certificates.get(id) ?? [];
+  const bestCert = certs.reduce<CertificateEvidence | null>(
+    (best, c) => (!best || CERTIFICATE_LEVEL_SCORE[c.level] > CERTIFICATE_LEVEL_SCORE[best.level] ? c : best),
+    null
+  );
+  components.assessment = bestCert
+    ? { raw: `HackerRank certificate: ${bestCert.name}`, normalized: CERTIFICATE_LEVEL_SCORE[bestCert.level], status: 'measured', source: 'hackerrank certificate' }
+    : { raw: 'No verified certificate', normalized: null, status: 'not_offered', source: 'assessment' };
 
   // Recency (10%) — most recent dated activity using the skill (§6).
   const activityDates: Date[] = [];
@@ -213,16 +315,21 @@ export function scoreSkill(id: string, ctx: Ctx): SkillScore {
     const d = parseResumeDate(profile.projects[i].endDate, true);
     if (d) activityDates.push(d);
   });
+  codingLangs.forEach((l) => l.lastActiveAt && activityDates.push(l.lastActiveAt));
+  if (id === 'dsa') {
+    for (const p of coding?.platforms ?? []) if (p.lastActiveAt) activityDates.push(new Date(p.lastActiveAt));
+  }
   const latest = activityDates.length ? new Date(Math.max(...activityDates.map((d) => d.getTime()))) : null;
   const days = latest ? Math.round(daysBetween(latest, asOf)) : null;
   components.recency = days === null
-    ? { raw: 'No dated activity', normalized: null, status: 'none_found', source: 'github & resume dates' }
+    ? { raw: 'No dated activity', normalized: 0, status: 'none_found', source: 'github & resume dates' }
     : { raw: days <= 1 ? 'Active now' : `${days} days ago`, normalized: recencyScore(days), status: 'measured', source: 'github & resume dates' };
 
   // Consistency (10%) — §15 sub-model, per skill.
-  const sources = [onResume, repos.length > 0, !!ctx.portfolioSkills?.has(id)].filter(Boolean).length;
+  const codingProof = codingLangs.length > 0 || (id === 'dsa' && !!coding);
+  const sources = [onResume, repos.length > 0, !!ctx.portfolioSkills?.has(id), codingProof, certs.length > 0].filter(Boolean).length;
   if (days === null) {
-    components.consistency = { raw: 'Needs dated activity', normalized: null, status: 'none_found', source: 'github & resume dates' };
+    components.consistency = { raw: 'Needs dated activity', normalized: 0, status: 'none_found', source: 'github & resume dates' };
   } else {
     const continued = repos.filter((r) => r.createdAt && r.lastActivity && daysBetween(r.createdAt, r.lastActivity) >= CONTINUATION_MIN_DAYS).length;
     const longRoles = roleIdx.filter((i) => (experienceMonths(profile.experience[i], asOf) ?? 0) >= 2).length;
@@ -244,24 +351,25 @@ export function scoreSkill(id: string, ctx: Ctx): SkillScore {
 
   // Portfolio (5%).
   components.portfolio = !ctx.portfolioSkills
-    ? { raw: 'No portfolio site', normalized: null, status: 'source_unavailable', source: 'portfolio' }
+    ? { raw: 'No portfolio site', normalized: 0, status: 'source_unavailable', source: 'portfolio' }
     : ctx.portfolioSkills.has(id)
       ? { raw: 'Detected on portfolio site', normalized: 100, status: 'measured', source: inputs.portfolio!.url }
       : { raw: 'Not detected on portfolio site', normalized: 0, status: 'none_found', source: inputs.portfolio!.url };
 
-  // Weighted sum (§8) with the missing-evidence rule (§29–31): components we
-  // can't measure (not offered) or whose source the candidate didn't provide
-  // (no GitHub, no portfolio) leave the denominator, so absence of a source is
-  // never scored as 0. That missing coverage shows up as lower confidence.
-  // A source that *was* checked and shows nothing ('none_found') counts as 0.
+  // Weighted sum (§8). Only components CareerLens can't measure yet ('not_offered',
+  // i.e. Assessment without a certificate) leave the denominator. A proof source
+  // the student didn't link (no GitHub, no portfolio) counts as 0 — proof is
+  // what the score rewards. Linked sources still drive confidence.
   const keys = Object.keys(SKILL_COMPONENT_WEIGHTS) as SkillComponentKey[];
-  const counts = (k: SkillComponentKey) => components[k].status === 'measured' || components[k].status === 'none_found';
-  const availableWeight = keys.filter(counts).reduce((a, k) => a + SKILL_COMPONENT_WEIGHTS[k], 0);
+  const counts = (k: SkillComponentKey) => components[k].status !== 'not_offered';
+  const provided = (k: SkillComponentKey) => components[k].status === 'measured' || components[k].status === 'none_found';
+  const scoringWeight = keys.filter(counts).reduce((a, k) => a + SKILL_COMPONENT_WEIGHTS[k], 0);
+  const availableWeight = keys.filter((k) => provided(k) && !UNOFFERED_SKILL_COMPONENTS.includes(k)).reduce((a, k) => a + SKILL_COMPONENT_WEIGHTS[k], 0);
   let num = 0;
   const list: ScoreComponent[] = keys.map((key) => {
     const c = components[key];
     const weight = SKILL_COMPONENT_WEIGHTS[key];
-    const effectiveWeight = counts(key) && availableWeight > 0 ? weight / availableWeight : 0;
+    const effectiveWeight = counts(key) && scoringWeight > 0 ? weight / scoringWeight : 0;
     const weighted = (c.normalized ?? 0) * effectiveWeight;
     num += weighted;
     return { key, label: COMPONENT_LABEL[key], ...c, weight, effectiveWeight: Math.round(effectiveWeight * 1000) / 1000, weighted: round1(weighted) };
@@ -275,7 +383,44 @@ export function scoreSkill(id: string, ctx: Ctx): SkillScore {
       ? claim.kind === 'technical'
       : projIdx.length > 0 || repos.length > 0;
 
-  const exactScore = round1(clamp(num));
+  // Proof: external sources that show the skill.
+  const proof: ProofSource[] = [];
+  const githubUrl = inputs.github ? `https://github.com/${inputs.github.username}` : null;
+  const linkedRepos = projIdx.map((i) => ctx.projectScores[i].linkedRepo).filter((r): r is string => !!r);
+  const proofRepos = Array.from(new Set([...repos.map((r) => r.name), ...linkedRepos]));
+  if (id === 'docker' || id === 'testing') {
+    const m = id === 'docker' ? dockerMilestone(ctx.repos, false) : testingMilestone(ctx.repos, false);
+    // A topic or description mention isn't proof; a Dockerfile / test config is.
+    if (m.score >= (id === 'docker' ? 50 : 60) && githubUrl) proof.push({ kind: 'github', label: 'GitHub', detail: m.label, url: githubUrl });
+  } else if (proofRepos.length && githubUrl) {
+    proof.push({
+      kind: 'github',
+      label: 'GitHub',
+      detail: `${proofRepos.length} repo${proofRepos.length > 1 ? 's' : ''}: ${proofRepos.slice(0, 3).join(', ')}${proofRepos.length > 3 ? '…' : ''}`,
+      url: proofRepos.length === 1 ? `${githubUrl}/${proofRepos[0]}` : githubUrl,
+    });
+  }
+  if (ctx.portfolioSkills?.has(id)) {
+    proof.push({ kind: 'portfolio', label: 'Portfolio', detail: 'Used on the live site', url: inputs.portfolio!.url });
+  }
+  for (const l of codingLangs) {
+    proof.push({ kind: 'coding', label: PLATFORM_INFO[l.platform].label, detail: `${l.solved} problem${l.solved === 1 ? '' : 's'} in ${l.name}`, url: l.url });
+  }
+  if (id === 'dsa') {
+    for (const p of coding?.platforms ?? []) {
+      if ((p.problemsSolved ?? 0) > 0 || (p.contests ?? 0) > 0) {
+        const bits = [p.problemsSolved ? `${p.problemsSolved} solved` : null, p.rank].filter(Boolean).join(', ');
+        proof.push({ kind: 'coding', label: PLATFORM_INFO[p.platform].label, detail: bits || 'Active profile', url: p.profileUrl });
+      }
+    }
+  }
+  for (const c of certs) proof.push({ kind: 'certificate', label: 'HackerRank certificate', detail: c.name, url: c.url });
+  const proven = proof.length > 0;
+
+  const weightedSum = round1(clamp(num));
+  // Without proof the score is scaled down and capped below "Emerging" (§8):
+  // a claim alone shouldn't count much toward competency or role fit.
+  const exactScore = proven ? weightedSum : round1(Math.min(weightedSum * UNPROVEN_SKILL.factor, UNPROVEN_SKILL.cap));
   const score = Math.round(exactScore);
   const confidence = Math.round((availableWeight / OFFERED_WEIGHT_SUM) * 100) / 100;
   const insufficientEvidence = confidence < INSUFFICIENT_EVIDENCE_CONFIDENCE && score <= 40;
@@ -291,9 +436,18 @@ export function scoreSkill(id: string, ctx: Ctx): SkillScore {
     insufficientEvidence,
     confidence,
     claimed: onResume,
-    claimGap: onResume && score <= 40,
+    claimGap: onResume && (!proven || score <= 40),
+    proof,
+    proven,
+    unprovenFrom: proven ? null : weightedSum,
     components: list,
-    sources: [onResume && 'resume', repos.length > 0 && 'github', ctx.portfolioSkills?.has(id) && 'portfolio'].filter(Boolean) as string[],
+    sources: [
+      onResume && 'resume',
+      proofRepos.length > 0 && 'github',
+      ctx.portfolioSkills?.has(id) && 'portfolio',
+      codingProof && 'coding',
+      certs.length > 0 && 'certificate',
+    ].filter(Boolean) as string[],
     evidence: {
       projects: projIdx.map((i) => profile.projects[i].name),
       roles: roleIdx.map((i) => [profile.experience[i].title, profile.experience[i].organization].filter(Boolean).join(' @ ')),

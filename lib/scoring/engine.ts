@@ -14,13 +14,18 @@ import {
   type ReadinessDimensionKey,
 } from './config';
 import { daysBetween, piecewise, recencyScore, round1, weightedScore, VERIFICATION_LABEL } from './normalize';
-import { buildContext, candidateSkillIds, scoreSkill, type SkillScore } from './skill-score';
+import { buildContext, candidateSkillIds, scoreSkill, type ProofSource, type SkillScore } from './skill-score';
 import { linkProjectsToRepos, projectEvidenceScore, scoreProject, type ProjectScore } from './project-score';
 import { computeRoleFit, recommendActions, type NextAction, type RoleFitResult } from './role-fit';
 import { ROLE_CATALOG, findRoleByTarget } from './roles-catalog';
 import type { EvidenceInputs, RepoSignals } from './evidence-inputs';
 import { repoSignals } from './evidence-inputs';
 import { summarizeAcademics, summarizeExperience, type AcademicSummary, type ExperienceSummary } from '@/lib/profile/academics';
+import { experienceScore } from './experience-score';
+import type { CodingComponent } from '@/lib/coding/analyzer';
+
+/** Metrics reported next to readiness but not part of it (§17, §22, §15). */
+export type SeparateMetric = { label: string; score: number | null; detail: string; breakdown?: CodingComponent[] };
 
 export type TraceNode = {
   label: string;
@@ -28,6 +33,10 @@ export type TraceNode = {
   /** Weight of this node inside its parent. */
   weight?: number;
   detail?: string;
+  /** Skill rows: where the skill is proven. Empty array = no proof; undefined = not a skill row. */
+  proof?: ProofSource[];
+  /** Skill rows: "implied by Next.js" or "no evidence" notes shown next to the proof. */
+  note?: string;
   children?: TraceNode[];
 };
 
@@ -72,6 +81,8 @@ export type ScoringResult = {
   roleAlignment: RoleAlignment | null;
   academics: AcademicSummary;
   experience: ExperienceSummary;
+  /** Academic profile and coding score: shown separately, never part of readiness. */
+  separateMetrics?: { academic: SeparateMetric; problemSolving: SeparateMetric };
   profileSource: 'llm' | 'fallback';
   trace: TraceNode;
 };
@@ -170,12 +181,13 @@ export function calculateReadiness(inputs: EvidenceInputs, opts: ReadinessOption
     : pickRole(inputs, opts.targetRole, scoreMap);
   const consistency = profileConsistency(repos, skills, asOf);
   const coding = inputs.coding ?? null;
+  const experienceDim = experienceScore(inputs.profile, asOf);
 
   const raw: Record<ReadinessDimensionKey, { score: number | null; status: DimensionStatus; detail: string }> = {
     technical: {
       score: technical.score,
       status: 'measured',
-      detail: `Mean of your ${TECHNICAL_TOP_SKILLS} strongest skill scores (empty slots count as 0).`,
+      detail: `Mean of your ${TECHNICAL_TOP_SKILLS} strongest skill scores (empty slots count as 0). Skills without proof count for less.`,
     },
     project: projectDim
       ? { score: projectDim.score, status: 'measured', detail: projects.length ? 'Top 3 projects weighted 50% / 30% / 20%.' : 'No projects found on the resume.' }
@@ -183,13 +195,19 @@ export function calculateReadiness(inputs: EvidenceInputs, opts: ReadinessOption
     roleAlignment: role
       ? { score: role.fit.exactFit, status: 'measured', detail: `Fit for ${role.roleTitle}${role.matchedBy === 'best_fit' ? ' (your best-fitting role)' : ''}.` }
       : { score: null, status: 'insufficient', detail: 'No role to compare against.' },
+    experience: experienceDim
+      ? {
+          score: experienceDim.score,
+          status: 'measured',
+          detail: experienceDim.roles
+            ? `From ${experienceDim.roles} role${experienceDim.roles > 1 ? 's' : ''} on your resume: relevant months 30%, technical relevance 30%, ownership 20%, production exposure 20%.`
+            : 'No internships or jobs on your resume yet.',
+        }
+      : { score: null, status: 'insufficient', detail: 'Roles can’t be read without AI extraction.' },
     interview: { score: null, status: 'not_offered', detail: 'Mock interviews aren’t available yet, so this dimension is left out rather than counted as 0.' },
     consistency: consistency
       ? { score: consistency.score, status: 'measured', detail: 'From your public GitHub activity.' }
       : { score: null, status: 'insufficient', detail: 'Link a GitHub profile to measure activity consistency.' },
-    problemSolving: coding
-      ? { score: coding.overallScore, status: 'measured', detail: `From ${coding.platforms.length} coding platform${coding.platforms.length > 1 ? 's' : ''}: strongest platform score plus 5 per extra active platform.` }
-      : { score: null, status: 'insufficient', detail: 'Add a LeetCode, Codeforces, CodeChef, HackerRank or GeeksforGeeks profile to measure problem solving.' },
   };
 
   const measuredWeight = (Object.keys(READINESS_WEIGHTS) as ReadinessDimensionKey[])
@@ -259,6 +277,27 @@ export function calculateReadiness(inputs: EvidenceInputs, opts: ReadinessOption
   const academics = summarizeAcademics(inputs.profile);
   const experience = summarizeExperience(inputs.profile, asOf);
 
+  // §17 — Academic profile = (CGPA / 10) × 100, or the stated percentage. Reported alone.
+  const degree = academics.postgraduation ?? academics.graduation;
+  const academicScore = degree ? round1(degree.statedAs === 'cgpa' ? degree.cgpa10 * 10 : degree.percent) : null;
+  const separateMetrics = {
+    academic: {
+      label: 'Academic Profile',
+      score: academicScore === null ? null : Math.round(academicScore),
+      detail: degree
+        ? `${degree.display} ${degree.statedAs === 'cgpa' ? '→ (CGPA ÷ 10) × 100' : 'as stated'}. Shown separately: CGPA doesn’t prove technical skills.`
+        : 'No graduation CGPA or percentage found on the resume.',
+    },
+    problemSolving: {
+      label: 'Problem Solving (coding profiles)',
+      score: coding ? coding.overallScore : null,
+      detail: coding
+        ? `Solved 30%, difficulty 25%, contests 20%, recent activity 15%, accuracy 10% across ${coding.platforms.length} platform${coding.platforms.length > 1 ? 's' : ''}. Also proves the DSA and language skills above.`
+        : 'Add a LeetCode, Codeforces, CodeChef, HackerRank or GeeksforGeeks profile.',
+      breakdown: coding?.breakdown,
+    },
+  };
+
   const trace: TraceNode = {
     label: 'Career Readiness',
     score: overallScore,
@@ -270,15 +309,22 @@ export function calculateReadiness(inputs: EvidenceInputs, opts: ReadinessOption
       detail: d.detail,
       children:
         d.key === 'technical'
-          ? technical.used.map((s) => ({ label: s.label, score: s.score, weight: round1(1000 / TECHNICAL_TOP_SKILLS) / 1000, detail: VERIFICATION_LABEL[s.verification] }))
+          ? technical.used.map((s) => ({ label: s.label, score: s.score, weight: round1(1000 / TECHNICAL_TOP_SKILLS) / 1000, detail: VERIFICATION_LABEL[s.verification], proof: s.proof ?? [] }))
           : d.key === 'project' && projectDim
             ? projectDim.used.map((p, i) => ({ label: p.name, score: Math.round(p.score), weight: [0.5, 0.3, 0.2][i], detail: p.linkedRepo ? `GitHub repo: ${p.linkedRepo}` : inputs.github ? 'No matching GitHub repo found' : 'Resume only (no GitHub linked)' }))
             : d.key === 'roleAlignment' && role
-              ? role.fit.requirements.map((r) => ({ label: r.label, score: Math.round(r.score), weight: r.importance, detail: `importance ${r.importance}${r.via === 'implied' ? `, implied by ${r.viaSkill}` : ''}` }))
+              ? role.fit.requirements.map((r) => ({
+                  label: r.matchedSkill ? `${r.label} (counted: ${r.matchedSkill})` : r.label,
+                  score: Math.round(r.score),
+                  weight: r.importance,
+                  detail: `importance ${r.importance}${r.via === 'implied' ? `, implied by ${r.viaSkill}` : ''}`,
+                  proof: r.proof ?? [],
+                  note: r.via === 'none' ? 'no evidence' : r.via === 'implied' ? `via ${r.viaSkill}` : undefined,
+                }))
               : d.key === 'consistency' && consistency
                 ? consistency.parts.map((p) => ({ label: p.label, score: p.value === null ? null : Math.round(p.value), weight: p.weight, detail: p.detail }))
-                : d.key === 'problemSolving' && coding
-                  ? coding.platforms.map((p) => ({ label: `${p.platform} (@${p.handle})`, score: p.score, detail: [p.problemsSolved != null ? `${p.problemsSolved} solved` : null, p.maxRating ?? p.rating ? `rating ${p.maxRating ?? p.rating}` : null].filter(Boolean).join(', ') || undefined }))
+                : d.key === 'experience' && experienceDim
+                  ? experienceDim.parts.map((p) => ({ label: p.label, score: Math.round(p.value), weight: p.weight, detail: p.detail }))
                   : undefined,
     })),
   };
@@ -308,6 +354,7 @@ export function calculateReadiness(inputs: EvidenceInputs, opts: ReadinessOption
     roleAlignment: role,
     academics,
     experience,
+    separateMetrics,
     profileSource: inputs.profile.source,
     trace,
   };
