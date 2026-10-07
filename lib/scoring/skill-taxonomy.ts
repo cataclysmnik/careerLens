@@ -122,7 +122,9 @@ const SKILLS: SkillDef[] = [
   { id: 'computer-vision', label: 'Computer Vision', category: 'ml', aliases: ['cv', 'opencv'], implies: ['machine-learning'] },
   { id: 'nlp', label: 'NLP', category: 'ml', aliases: ['natural language processing'], implies: ['machine-learning'] },
   { id: 'llm', label: 'LLMs / GenAI', category: 'ml', aliases: ['llm', 'llms', 'generative ai', 'genai', 'openai', 'langchain', 'rag'] },
-  { id: 'data-analysis', label: 'Data Analysis', category: 'data', aliases: ['data analytics', 'excel', 'power bi', 'tableau'] },
+  { id: 'data-analysis', label: 'Data Analysis', category: 'data', aliases: ['data analytics', 'power bi', 'tableau'] },
+  // Its own skill: accountants, marketers and engineers list Excel without doing data analysis.
+  { id: 'excel', label: 'Excel', category: 'data', aliases: ['microsoft excel', 'ms excel', 'advanced excel'] },
   { id: 'spark', label: 'Apache Spark', category: 'data', aliases: ['spark', 'pyspark'] },
 
   // Mobile
@@ -208,7 +210,8 @@ export function allSkillSurfaceForms(): { id: string; form: string }[] {
 
 // Aliases that are ordinary English words. In free text they only count in the
 // tech spelling ("REST API" yes, "the rest of" no) or not at all.
-const PROSE_SKIP = new Set(['next', 'networking', 'containers', 'nest', 'torch', 'rag', 'shell']);
+// "testing" alone is A/B testing, equipment testing… ("unit testing", "test automation" still count).
+const PROSE_SKIP = new Set(['next', 'networking', 'containers', 'nest', 'torch', 'rag', 'shell', 'testing']);
 const PROSE_EXACT_CASE: Record<string, string> = {
   rest: 'REST', react: 'React', express: 'Express', spring: 'Spring', rails: 'Rails', spark: 'Spark',
   excel: 'Excel', node: 'Node', lambda: 'Lambda', angular: 'Angular', swift: 'Swift', rust: 'Rust', unix: 'Unix',

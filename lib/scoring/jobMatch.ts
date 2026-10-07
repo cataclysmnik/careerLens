@@ -43,12 +43,12 @@ export type JobFitResult = {
   skillScores: SkillScore[];
   assessment: FitAssessment | null;
   /** Set when requirements came from researching a role rather than a pasted JD. */
-  research: Pick<RoleResearch, 'role' | 'method' | 'postingCount' | 'frequencies' | 'sourcesTried' | 'fetchedAt'> & {
+  research: Pick<RoleResearch, 'role' | 'method' | 'postingCount' | 'frequencies' | 'sourcesTried' | 'fetchedAt' | 'smallSample' | 'aiReadPostings'> & {
     postings: RoleResearch['postings'];
   } | null;
   ai: {
     enabled: boolean;
-    jdParsedBy: 'llm' | 'keywords' | 'job_postings' | 'role_catalog';
+    jdParsedBy: 'llm' | 'keywords' | 'job_postings' | 'role_catalog' | 'ai_estimate';
     assessment: 'llm' | 'unavailable';
     profileSource: 'llm' | 'fallback';
     errors: string[];
@@ -138,6 +138,8 @@ export async function analyzeRoleFit(inputs: EvidenceInputs, research: RoleResea
       frequencies: research.frequencies,
       sourcesTried: research.sourcesTried,
       fetchedAt: research.fetchedAt,
+      smallSample: research.smallSample,
+      aiReadPostings: research.aiReadPostings,
       postings: research.postings.slice(0, 12),
     },
   });

@@ -89,9 +89,17 @@ function ResearchSources({ research }: { research: NonNullable<JobFitResult['res
     <div className={card}>
       <h3 className="font-bold mb-1 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-600" /> Where these requirements come from</h3>
       <p className="text-sm text-gray-500 mb-4">
-        {fromPostings
-          ? <>Measured from <b>{research.postingCount}</b> current {research.role} postings: each skill&apos;s importance is the share of postings that ask for it (60%+ → 5, 40%+ → 4, 25%+ → 3, 15%+ → 2, 10%+ → 1).</>
-          : <>Too few current postings matched “{research.role}”, so CareerLens&apos;s built-in {research.role} profile was used instead.</>}
+        {fromPostings ? (
+          <>
+            Measured from <b>{research.postingCount}</b> current {research.role} postings: each skill&apos;s importance is the share of postings that ask for it (60%+ → 5, 40%+ → 4, 25%+ → 3, 15%+ → 2, 10%+ → 1).
+            {research.aiReadPostings && ' AI listed the skills each posting asks for; the counting and weights are plain arithmetic.'}
+            {research.smallSample && <b className="text-amber-600"> Only a few postings matched, so treat these weights as rough.</b>}
+          </>
+        ) : research.method === 'role_catalog' ? (
+          <>Too few current postings matched “{research.role}”, so CareerLens&apos;s built-in {research.role} profile was used instead.</>
+        ) : (
+          <><b className="text-amber-600">No current postings matched “{research.role}”.</b> These requirements are an AI estimate of what the role typically needs, not measured from postings. Your scores are still calculated from your evidence by formula.</>
+        )}
         {' '}Fetched {new Date(research.fetchedAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.
       </p>
       {fromPostings && research.frequencies.length > 0 && (
@@ -203,9 +211,11 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
         <p className="text-sm text-gray-500 mb-4">
           {result.research?.method === 'job_postings'
             ? 'Importance comes from how many current postings ask for each skill.'
-            : result.research
+            : result.research?.method === 'role_catalog'
               ? 'Importance comes from the CareerLens role profile.'
-              : 'Importance is read from the JD by AI.'}{' '}
+              : result.research
+                ? 'Importance is an AI estimate for this role (no postings found).'
+                : 'Importance is read from the JD by AI.'}{' '}
           Scores come from your evidence, never from the AI. The black tick marks the target score.
         </p>
         <div className="overflow-x-auto">
