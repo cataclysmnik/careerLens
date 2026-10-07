@@ -15,16 +15,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
-  FolderGit2,
+  Briefcase,
 } from 'lucide-react';
-import type { InterviewEvaluation, InterviewProject } from '@/lib/interview/engine';
+import type { InterviewEvaluation } from '@/lib/interview/engine';
 
 interface ProgressTrackerProps {
   onStartNewSession: () => void;
-  onSelectPastSession: (sessionData: {
-    evaluation: InterviewEvaluation;
-    project: InterviewProject;
-  }) => void;
+  onSelectPastSession: (evaluation: InterviewEvaluation) => void;
 }
 
 export function ProgressTracker({
@@ -37,8 +34,8 @@ export function ProgressTracker({
       totalSessions: number;
       averageScore: number;
       growthRate: number | null;
-      scoreTrend: { id: string; date: string; score: number; projectTitle: string; roleFocus: string }[];
-      metricsAverage: { technicalDepth: number; clarity: number; architecture: number; problemSolving: number } | null;
+      scoreTrend: { id: string; date: string; score: number; roleTitle: string; seniority: string }[];
+      metricsAverage: { roleFoundations: number; projectDepth: number; architecture: number; communication: number } | null;
       topStrengths: string[];
       topAreasToImprove: string[];
     };
@@ -101,14 +98,14 @@ export function ProgressTracker({
             No Completed Sessions Yet
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-            Take your first project mock interview! Complete an interview to track score improvements, unlock Google-style resume rewrites, and analyze competency trends.
+            Take your first real-life job mock interview! Practice against realistic technical questions, unlock role-tailored resume rewrites, and track your interview mastery across roles over time.
           </p>
         </div>
         <button
           onClick={onStartNewSession}
           className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm shadow-md transition-all cursor-pointer"
         >
-          Start Your First Mock Interview
+          Start Your First Job Mock Interview
         </button>
       </div>
     );
@@ -121,10 +118,10 @@ export function ProgressTracker({
         <div>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            Interview Progress & Mastery Over Time
+            Job Interview Progress & Mastery Over Time
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Tracking your communication, technical depth, and architectural performance across practice rounds.
+            Tracking your communication, technical depth, and architectural performance across roles.
           </p>
         </div>
         <button
@@ -150,7 +147,7 @@ export function ProgressTracker({
             {stats.averageScore}
             <span className="text-sm font-normal text-gray-400">/100</span>
           </div>
-          <span className="text-[11px] text-gray-400">Across all completed projects</span>
+          <span className="text-[11px] text-gray-400">Across all completed job roles</span>
         </div>
 
         <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-sm space-y-1">
@@ -169,9 +166,9 @@ export function ProgressTracker({
         </div>
 
         <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-sm space-y-1">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Top Competency</span>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Strongest Category</span>
           <div className="text-xl font-bold text-gray-900 dark:text-white line-clamp-1 pt-1">
-            {stats.metricsAverage?.technicalDepth && stats.metricsAverage.technicalDepth >= 80 ? 'Technical Depth' : 'Communication'}
+            {stats.metricsAverage?.projectDepth && stats.metricsAverage.projectDepth >= 80 ? 'Project Depth' : 'Core Foundations'}
           </div>
           <span className="text-[11px] text-gray-400">Consistent highest category</span>
         </div>
@@ -183,12 +180,11 @@ export function ProgressTracker({
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-blue-500" />
-              Score Trajectory Across Rounds
+              Score Trajectory Across Roles
             </h3>
             <span className="text-xs text-gray-400">Past {stats.scoreTrend.length} sessions</span>
           </div>
 
-          {/* Simple Clean Responsive SVG Trend Line */}
           <div className="h-44 w-full relative pt-4 pb-2">
             <svg className="w-full h-full overflow-visible" viewBox="0 0 500 120" preserveAspectRatio="none">
               <defs>
@@ -198,13 +194,12 @@ export function ProgressTracker({
                 </linearGradient>
               </defs>
 
-              {/* Coordinates */}
               {(() => {
                 const points = stats.scoreTrend.map((s, idx) => {
                   const x = (idx / (stats.scoreTrend.length - 1)) * 480 + 10;
                   const clamped = Math.max(0, Math.min(100, s.score));
                   const y = 110 - (clamped / 100) * 90;
-                  return { x, y, score: s.score, title: s.projectTitle };
+                  return { x, y, score: s.score, role: s.roleTitle };
                 });
 
                 const lineD = points.reduce((acc, p, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`, '');
@@ -237,18 +232,17 @@ export function ProgressTracker({
 
       {/* Competency Averages & Recurring Insights */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Core Skill Breakdown */}
         {stats.metricsAverage && (
           <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-sm space-y-4">
             <h3 className="font-bold text-gray-900 dark:text-white text-sm">
-              Average Competency Breakdown
+              Average Role Competency Breakdown
             </h3>
             <div className="space-y-3.5">
               {[
-                { label: 'Technical Depth', val: stats.metricsAverage.technicalDepth },
-                { label: 'Communication Clarity', val: stats.metricsAverage.clarity },
+                { label: 'Role Core Foundations', val: stats.metricsAverage.roleFoundations },
+                { label: 'Project Implementation Depth', val: stats.metricsAverage.projectDepth },
                 { label: 'System Architecture', val: stats.metricsAverage.architecture },
-                { label: 'Problem Solving', val: stats.metricsAverage.problemSolving },
+                { label: 'Communication & Clarity', val: stats.metricsAverage.communication },
               ].map((item) => (
                 <div key={item.label} className="space-y-1">
                   <div className="flex justify-between text-xs font-medium">
@@ -316,6 +310,7 @@ export function ProgressTracker({
               day: 'numeric',
               year: 'numeric',
             });
+            const roleName = session.roleTitle || session.projectTitle || 'Software Engineer';
 
             return (
               <div
@@ -323,21 +318,11 @@ export function ProgressTracker({
                 onClick={() => {
                   if (session.feedback && session.resumeRewrites) {
                     onSelectPastSession({
-                      evaluation: {
-                        overallScore: session.overallScore,
-                        metrics: session.metrics,
-                        feedback: session.feedback,
-                        resumeRewrites: session.resumeRewrites,
-                      },
-                      project: {
-                        id: session.id,
-                        title: session.projectTitle,
-                        description: '',
-                        skills: [],
-                        components: [],
-                        architecturePatterns: [],
-                        source: 'resume',
-                      },
+                      overallScore: session.overallScore,
+                      roleTitle: roleName,
+                      metrics: session.metrics,
+                      feedback: session.feedback,
+                      resumeRewrites: session.resumeRewrites,
                     });
                   }
                 }}
@@ -345,11 +330,12 @@ export function ProgressTracker({
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {session.projectTitle}
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                      {roleName}
                     </h4>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300">
-                      {session.roleFocus?.replace(/_/g, ' ')}
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 capitalize">
+                      {session.seniority}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-400">

@@ -3,13 +3,13 @@ import { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db/prisma';
 import {
-  extractStudentProjects,
-  generateNextTurn,
-  type InterviewFocus,
+  generateJobInterviewNextTurn,
+  matchProjectsToRole,
+  type SeniorityLevel,
   type InterviewerType,
   type InterviewMessage,
+  type InterviewProject,
 } from '@/lib/interview/engine';
-import type { StoredEvidence } from '@/lib/evidence/student-evidence';
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -35,29 +35,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'This session has already ended' }, { status: 400 });
     }
 
-    const [evidenceRow, profileRow] = await Promise.all([
-      prisma.studentEvidence.findUnique({ where: { userId: session.user.id } }),
-      prisma.profile.findUnique({
-        where: { userId: session.user.id },
-        select: { targetRole: true },
-      }),
-    ]);
+    const targetRole = interviewSession.roleTitle || 'Software Engineer';
+    const seniority = (interviewSession.seniority as SeniorityLevel) || 'entry';
+    const interviewerType = (interviewSession.interviewerType as InterviewerType) || 'tech_lead';
 
-    const storedEvidence = (evidenceRow?.evidence as unknown as StoredEvidence) || null;
-    const allProjects = extractStudentProjects(storedEvidence);
-    const matchedProject =
-      allProjects.find(
-        (p) => p.title.toLowerCase() === interviewSession.projectTitle.toLowerCase()
-      ) ||
-      allProjects[0] || {
-        id: 'generic',
-        title: interviewSession.projectTitle,
-        description: 'Engineering project',
-        skills: [],
-        components: [],
-        architecturePatterns: [],
-        source: 'resume' as const,
-      };
+    const rawRelevant = (interviewSession.relevantProjects as unknown as InterviewProject[]) || [];
+    const roleSetup = matchProjectsToRole(targetRole, rawRelevant);
 
     const existingMessages = (interviewSession.messages as unknown as InterviewMessage[]) || [];
 
@@ -70,13 +53,15 @@ export async function POST(req: Request) {
 
     const messagesWithUser = [...existingMessages, userMessage];
 
-    // Generate AI interviewer next question
-    const aiTurn = await generateNextTurn({
-      project: matchedProject,
-      focus: (interviewSession.roleFocus as InterviewFocus) || 'project_deep_dive',
-      interviewerType: (interviewSession.interviewerType as InterviewerType) || 'tech_lead',
+    // Generate real-life next question (alternating project deep dive & general role tech questions)
+    const aiTurn = await generateJobInterviewNextTurn({
+      targetRole,
+      seniority,
+      interviewerType,
+      relevantProjects: roleSetup.relevantProjects,
+      matchedRoleSkills: roleSetup.matchedRoleSkills,
+      expectedTopics: roleSetup.expectedTopics,
       messages: messagesWithUser,
-      targetRole: profileRow?.targetRole,
     });
 
     const assistantMessage: InterviewMessage = {
@@ -85,6 +70,7 @@ export async function POST(req: Request) {
       content: aiTurn.message,
       timestamp: new Date().toISOString(),
       critique: aiTurn.critique,
+      topicType: aiTurn.topicType as any,
     };
 
     const allMessages = [...messagesWithUser, assistantMessage];
@@ -101,6 +87,7 @@ export async function POST(req: Request) {
         session: updatedSession,
         assistantMessage,
         critique: aiTurn.critique,
+        topicType: aiTurn.topicType,
       },
     });
   } catch (error) {

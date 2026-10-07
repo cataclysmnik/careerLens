@@ -3,9 +3,10 @@ import { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db/prisma';
 import {
-  extractStudentProjects,
-  generateOpeningQuestion,
-  type InterviewFocus,
+  extractAllProjects,
+  matchProjectsToRole,
+  generateJobInterviewOpening,
+  type SeniorityLevel,
   type InterviewerType,
   type InterviewMessage,
 } from '@/lib/interview/engine';
@@ -20,29 +21,30 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const {
-      projectId,
-      focus = 'project_deep_dive',
+      targetRole = 'Full Stack Developer',
+      seniority = 'entry',
       interviewerType = 'tech_lead',
     } = body;
 
-    const [evidenceRow, profileRow] = await Promise.all([
-      prisma.studentEvidence.findUnique({ where: { userId: session.user.id } }),
-      prisma.profile.findUnique({
-        where: { userId: session.user.id },
-        select: { targetRole: true },
-      }),
-    ]);
+    const evidenceRow = await prisma.studentEvidence.findUnique({
+      where: { userId: session.user.id },
+    });
 
     const storedEvidence = (evidenceRow?.evidence as unknown as StoredEvidence) || null;
-    const allProjects = extractStudentProjects(storedEvidence);
-    const selectedProject =
-      allProjects.find((p) => p.id === projectId) || allProjects[0];
+    const allProjects = extractAllProjects(storedEvidence);
 
-    const opening = await generateOpeningQuestion({
-      project: selectedProject,
-      focus: focus as InterviewFocus,
+    // Automatically match the student's relevant projects and skills for this role
+    const { relevantProjects, matchedRoleSkills, expectedTopics } = matchProjectsToRole(
+      targetRole,
+      allProjects
+    );
+
+    const opening = await generateJobInterviewOpening({
+      targetRole,
+      seniority: seniority as SeniorityLevel,
       interviewerType: interviewerType as InterviewerType,
-      targetRole: profileRow?.targetRole,
+      relevantProjects,
+      matchedRoleSkills,
     });
 
     const initialMessage: InterviewMessage = {
@@ -51,13 +53,17 @@ export async function POST(req: Request) {
       content: opening.message,
       timestamp: new Date().toISOString(),
       critique: null,
+      topicType: 'intro',
     };
 
     const newSession = await prisma.interviewSession.create({
       data: {
         userId: session.user.id,
-        projectTitle: selectedProject.title,
-        roleFocus: focus,
+        roleTitle: targetRole,
+        seniority: seniority as string,
+        projectTitle: relevantProjects[0]?.title || null,
+        relevantProjects: relevantProjects as unknown as Prisma.InputJsonValue,
+        roleFocus: 'job_mock_interview',
         interviewerType,
         status: 'in_progress',
         messages: [initialMessage] as unknown as Prisma.InputJsonValue,
@@ -67,12 +73,16 @@ export async function POST(req: Request) {
     return NextResponse.json({
       data: {
         session: newSession,
-        project: selectedProject,
+        targetRole,
+        seniority,
+        relevantProjects,
+        matchedRoleSkills,
+        expectedTopics,
         suggestedFocusAreas: opening.suggestedFocusAreas,
       },
     });
   } catch (error) {
-    console.error('Failed to start interview session:', error);
+    console.error('Failed to start real-life job mock interview:', error);
     return NextResponse.json({ error: 'Failed to start interview session' }, { status: 500 });
   }
 }

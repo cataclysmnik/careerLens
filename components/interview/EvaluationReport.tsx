@@ -15,19 +15,18 @@ import {
   ArrowRight,
   ShieldCheck,
   Brain,
+  Briefcase,
 } from 'lucide-react';
 import type { InterviewEvaluation, InterviewProject } from '@/lib/interview/engine';
 
 interface EvaluationReportProps {
   evaluation: InterviewEvaluation;
-  project: InterviewProject;
   onRestart: () => void;
   onViewHistory: () => void;
 }
 
 export function EvaluationReport({
   evaluation,
-  project,
   onRestart,
   onViewHistory,
 }: EvaluationReportProps) {
@@ -48,10 +47,10 @@ export function EvaluationReport({
   const verdict = getScoreVerdict(evaluation.overallScore);
 
   const metricItems = [
-    { label: 'Technical Depth', score: evaluation.metrics.technicalDepth, desc: 'Knowledge of internals, database engines & execution' },
-    { label: 'Communication Clarity', score: evaluation.metrics.clarity, desc: 'Precision, conciseness, avoiding vague claims' },
-    { label: 'System Architecture', score: evaluation.metrics.architecture, desc: 'Component boundaries, data flows & scaling trade-offs' },
-    { label: 'Problem Solving', score: evaluation.metrics.problemSolving, desc: 'Handling edge cases, failure states & debugging' },
+    { label: 'Role Core Foundations', score: evaluation.metrics.roleFoundations, desc: 'Mastery of fundamental concepts and language protocols' },
+    { label: 'Project Implementation Depth', score: evaluation.metrics.projectDepth, desc: 'Authentic understanding of code, schemas, and logic' },
+    { label: 'System Architecture', score: evaluation.metrics.architecture, desc: 'Scalability, error recovery, caching & trade-off decisions' },
+    { label: 'Communication & Clarity', score: evaluation.metrics.communication, desc: 'Structured articulation, conciseness, avoiding fluff' },
   ];
 
   return (
@@ -63,18 +62,21 @@ export function EvaluationReport({
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold tracking-wide uppercase bg-white/5 border-white/10">
-              <Award className="w-3.5 h-3.5 text-blue-400" />
-              Interview Evaluation Debrief
+              <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+              {evaluation.roleTitle} Technical Screen Evaluation
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              Performance Report: {project.title}
+              Mock Interview Results: {evaluation.roleTitle}
             </h1>
+            <p className="text-zinc-300 font-medium text-xs">
+              Verdict: <span className="text-white font-bold">{evaluation.feedback.roleReadinessVerdict}</span>
+            </p>
             <p className="text-zinc-400 text-sm max-w-xl leading-relaxed">
               {evaluation.feedback.summary}
             </p>
           </div>
 
-          {/* Large Circular / Metric Score Card */}
+          {/* Large Metric Score Card */}
           <div className="flex-shrink-0 flex flex-col items-center justify-center bg-zinc-800/80 border border-zinc-700 p-6 rounded-2xl min-w-[160px] text-center shadow-inner">
             <span className="text-4xl md:text-5xl font-black text-white tracking-tight">
               {evaluation.overallScore}
@@ -106,19 +108,19 @@ export function EvaluationReport({
         </div>
       </div>
 
-      {/* Resume Rewrite Suggestions Section (Crucial Highlight!) */}
+      {/* Role-Tailored Resume Rewrite Suggestions Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">
               <Sparkles className="w-4 h-4" />
-              Tailored Resume Enhancements
+              Tailored for {evaluation.roleTitle}
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Resume Rewrite Suggestions
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Based on the technical depth and metrics you explained during the interview, here is how you should rewrite your resume bullets to pass ATS filters and impress engineering managers.
+              Based on the technical explanations you provided in this interview, here is how you should rewrite your resume bullets to target {evaluation.roleTitle} recruiters.
             </p>
           </div>
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
@@ -153,7 +155,7 @@ export function EvaluationReport({
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide flex items-center gap-1">
                             <Sparkles className="w-3 h-3 text-blue-500" />
-                            Recommended High-Impact Bullet
+                            Role-Tailored Bullet for {evaluation.roleTitle}
                           </span>
                         </div>
                         <p className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">
@@ -189,7 +191,7 @@ export function EvaluationReport({
                 {/* Reasoning & Metric breakdown */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 text-xs border-t border-gray-100 dark:border-zinc-800/80">
                   <div className="text-gray-600 dark:text-gray-400">
-                    <strong className="text-gray-800 dark:text-gray-200">Why this works: </strong>
+                    <strong className="text-gray-800 dark:text-gray-200">Why recruiters love this: </strong>
                     {rewrite.reasoning}
                   </div>
                   <div className="flex flex-wrap gap-1.5 flex-shrink-0">
@@ -215,7 +217,7 @@ export function EvaluationReport({
         <div className="rounded-2xl border border-emerald-200 dark:border-emerald-950/60 bg-emerald-50/30 dark:bg-emerald-950/10 p-6 space-y-4">
           <h3 className="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            Key Technical Strengths
+            Verified Technical Strengths
           </h3>
           <ul className="space-y-3">
             {evaluation.feedback.strengths.map((str, idx) => (
@@ -231,7 +233,7 @@ export function EvaluationReport({
         <div className="rounded-2xl border border-amber-200 dark:border-amber-950/60 bg-amber-50/30 dark:bg-amber-950/10 p-6 space-y-4">
           <h3 className="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            Areas for Refinement
+            High-Priority Refinements for {evaluation.roleTitle}
           </h3>
           <ul className="space-y-3">
             {evaluation.feedback.areasToImprove.map((area, idx) => (
@@ -249,7 +251,7 @@ export function EvaluationReport({
         <div className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 p-6 space-y-3">
           <h3 className="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2">
             <Lightbulb className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            Interview Preparation Takeaways
+            Preparation Takeaways
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {evaluation.feedback.keyTakeaways.map((tip, idx) => (
@@ -271,7 +273,7 @@ export function EvaluationReport({
           className="flex items-center gap-2 px-6 py-3 rounded-xl border border-gray-300 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-200 font-semibold text-sm transition-all cursor-pointer w-full sm:w-auto justify-center"
         >
           <RotateCcw className="w-4 h-4" />
-          Practice Another Project
+          Practice Another Job Role
         </button>
 
         <button

@@ -44,8 +44,9 @@ export async function GET(req: Request) {
         id: s.id,
         date: s.createdAt.toISOString(),
         score: s.overallScore,
+        roleTitle: s.roleTitle || s.projectTitle || 'Software Engineer',
         projectTitle: s.projectTitle,
-        roleFocus: s.roleFocus,
+        seniority: s.seniority || 'entry_mid',
       }));
 
     // Growth percentage compared to the initial session
@@ -59,17 +60,31 @@ export async function GET(req: Request) {
     }
 
     // Aggregated metrics
-    const metricsSum = { technicalDepth: 0, clarity: 0, architecture: 0, problemSolving: 0, count: 0 };
+    const metricsSum = {
+      roleFoundations: 0,
+      projectDepth: 0,
+      architecture: 0,
+      communication: 0,
+      count: 0,
+    };
     const allStrengths: string[] = [];
     const allAreasToImprove: string[] = [];
 
     for (const s of completed) {
-      const m = s.metrics as { technicalDepth?: number; clarity?: number; architecture?: number; problemSolving?: number } | null;
+      const m = s.metrics as {
+        roleFoundations?: number;
+        projectDepth?: number;
+        technicalDepth?: number;
+        architecture?: number;
+        communication?: number;
+        clarity?: number;
+      } | null;
+
       if (m) {
-        metricsSum.technicalDepth += m.technicalDepth || 0;
-        metricsSum.clarity += m.clarity || 0;
+        metricsSum.roleFoundations += m.roleFoundations || m.technicalDepth || 0;
+        metricsSum.projectDepth += m.projectDepth || m.technicalDepth || 0;
         metricsSum.architecture += m.architecture || 0;
-        metricsSum.problemSolving += m.problemSolving || 0;
+        metricsSum.communication += m.communication || m.clarity || 0;
         metricsSum.count++;
       }
 
@@ -79,10 +94,10 @@ export async function GET(req: Request) {
     }
 
     const metricsAverage = metricsSum.count > 0 ? {
-      technicalDepth: Math.round(metricsSum.technicalDepth / metricsSum.count),
-      clarity: Math.round(metricsSum.clarity / metricsSum.count),
+      roleFoundations: Math.round(metricsSum.roleFoundations / metricsSum.count),
+      projectDepth: Math.round(metricsSum.projectDepth / metricsSum.count),
       architecture: Math.round(metricsSum.architecture / metricsSum.count),
-      problemSolving: Math.round(metricsSum.problemSolving / metricsSum.count),
+      communication: Math.round(metricsSum.communication / metricsSum.count),
     } : null;
 
     return NextResponse.json({

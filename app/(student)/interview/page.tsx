@@ -10,38 +10,40 @@ import {
   Loader2,
   FileText,
   AlertCircle,
-  Layers,
+  Briefcase,
 } from 'lucide-react';
-import { ProjectSelectModal } from '@/components/interview/ProjectSelectModal';
+import { JobRoleSetupModal } from '@/components/interview/JobRoleSetupModal';
 import { InterviewChat } from '@/components/interview/InterviewChat';
 import { EvaluationReport } from '@/components/interview/EvaluationReport';
 import { ProgressTracker } from '@/components/interview/ProgressTracker';
 import type {
   InterviewProject,
-  InterviewFocus,
+  SeniorityLevel,
   InterviewerType,
   InterviewMessage,
   InterviewEvaluation,
 } from '@/lib/interview/engine';
 
-type ViewMode = 'select' | 'interview' | 'report' | 'progress';
+type ViewMode = 'setup' | 'interview' | 'report' | 'progress';
 
 export default function InterviewPage() {
-  const [viewMode, setViewMode] = useState<ViewMode>('select');
+  const [viewMode, setViewMode] = useState<ViewMode>('setup');
   const [activeTab, setActiveTab] = useState<'arena' | 'progress'>('arena');
 
-  const [projects, setProjects] = useState<InterviewProject[]>([]);
-  const [targetRole, setTargetRole] = useState<string | null>(null);
-  const [hasEvidence, setHasEvidence] = useState<boolean>(true);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [allProjects, setAllProjects] = useState<InterviewProject[]>([]);
+  const [defaultRole, setDefaultRole] = useState<string>('Full Stack Developer');
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+  const [isLoadingSetup, setIsLoadingSetup] = useState(true);
 
   // Active Session State
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [currentProject, setCurrentProject] = useState<InterviewProject | null>(null);
-  const [currentInterviewerType, setCurrentInterviewerType] = useState<InterviewerType>('tech_lead');
-  const [currentFocus, setCurrentFocus] = useState<InterviewFocus>('project_deep_dive');
-  const [currentMessages, setCurrentMessages] = useState<InterviewMessage[]>([]);
+  const [targetRole, setTargetRole] = useState<string>('Full Stack Developer');
+  const [seniority, setSeniority] = useState<SeniorityLevel>('entry');
+  const [interviewerType, setInterviewerType] = useState<InterviewerType>('tech_lead');
+  const [relevantProjects, setRelevantProjects] = useState<InterviewProject[]>([]);
+  const [messages, setMessages] = useState<InterviewMessage[]>([]);
   const [suggestedFocusAreas, setSuggestedFocusAreas] = useState<string[]>([]);
+  const [expectedTopics, setExpectedTopics] = useState<string[]>([]);
 
   // Evaluation Report State
   const [evaluation, setEvaluation] = useState<InterviewEvaluation | null>(null);
@@ -54,26 +56,26 @@ export default function InterviewPage() {
   useEffect(() => {
     fetch('/api/interview/projects')
       .then((res) => {
-        if (!res.ok) throw new Error('Failed to load projects');
+        if (!res.ok) throw new Error('Failed to load setup');
         return res.json();
       })
       .then((json) => {
         if (json?.data) {
-          setProjects(json.data.projects || []);
-          setTargetRole(json.data.targetRole || null);
-          setHasEvidence(Boolean(json.data.hasEvidence));
+          setAllProjects(json.data.allProjects || []);
+          setDefaultRole(json.data.targetRole || 'Full Stack Developer');
+          setAvailableRoles(json.data.availableRoles || []);
         }
       })
       .catch((err) => {
         console.error(err);
-        setError('Failed to fetch projects. Please upload your resume first.');
+        setError('Failed to fetch profile projects. Please verify your resume is uploaded.');
       })
-      .finally(() => setIsLoadingProjects(false));
+      .finally(() => setIsLoadingSetup(false));
   }, []);
 
   const handleStartSession = async (config: {
-    projectId: string;
-    focus: InterviewFocus;
+    targetRole: string;
+    seniority: SeniorityLevel;
     interviewerType: InterviewerType;
   }) => {
     setIsStarting(true);
@@ -91,13 +93,21 @@ export default function InterviewPage() {
         throw new Error(json.error || 'Failed to start interview session');
       }
 
-      const { session, project, suggestedFocusAreas } = json.data;
+      const {
+        session,
+        relevantProjects: matchedProjects,
+        suggestedFocusAreas: focusAreas,
+        expectedTopics: topics,
+      } = json.data;
+
       setCurrentSessionId(session.id);
-      setCurrentProject(project);
-      setCurrentInterviewerType(config.interviewerType);
-      setCurrentFocus(config.focus);
-      setCurrentMessages(session.messages || []);
-      setSuggestedFocusAreas(suggestedFocusAreas || []);
+      setTargetRole(config.targetRole);
+      setSeniority(config.seniority);
+      setInterviewerType(config.interviewerType);
+      setRelevantProjects(matchedProjects || []);
+      setMessages(session.messages || []);
+      setSuggestedFocusAreas(focusAreas || []);
+      setExpectedTopics(topics || []);
       setViewMode('interview');
     } catch (err: unknown) {
       console.error(err);
@@ -121,7 +131,7 @@ export default function InterviewPage() {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error || 'Failed to evaluate session');
+        throw new Error(json.error || 'Failed to evaluate interview');
       }
 
       setEvaluation(json.data.evaluation);
@@ -134,12 +144,8 @@ export default function InterviewPage() {
     }
   };
 
-  const handleSelectPastSession = (sessionData: {
-    evaluation: InterviewEvaluation;
-    project: InterviewProject;
-  }) => {
-    setEvaluation(sessionData.evaluation);
-    setCurrentProject(sessionData.project);
+  const handleSelectPastSession = (pastEval: InterviewEvaluation) => {
+    setEvaluation(pastEval);
     setViewMode('report');
     setActiveTab('arena');
   };
@@ -150,15 +156,15 @@ export default function InterviewPage() {
         {/* Navigation Tabs Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-zinc-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
               <BotMessageSquare className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
-                AI Project Mock Interviewer
+              <h1 className="text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                Real-Life Job Mock Interviewer
               </h1>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Project-tailored technical probing, resume rewrites, and progress tracking
+                Job-role technical screening, project-grounded questions, resume rewrites, and progress tracking
               </p>
             </div>
           </div>
@@ -168,7 +174,7 @@ export default function InterviewPage() {
             <button
               onClick={() => {
                 setActiveTab('arena');
-                if (viewMode === 'progress') setViewMode('select');
+                if (viewMode === 'progress') setViewMode('setup');
               }}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'arena'
@@ -176,7 +182,7 @@ export default function InterviewPage() {
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
-              <BotMessageSquare className="w-4 h-4" />
+              <Briefcase className="w-4 h-4" />
               Interview Arena
             </button>
             <button
@@ -196,7 +202,7 @@ export default function InterviewPage() {
           </div>
         </div>
 
-        {/* Global Error Banner */}
+        {/* Global Error Alert */}
         {error && (
           <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex items-center gap-3 text-xs text-red-700 dark:text-red-300">
             <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />
@@ -204,45 +210,47 @@ export default function InterviewPage() {
           </div>
         )}
 
-        {/* Main Content Area */}
-        {isLoadingProjects ? (
+        {/* Dynamic View Display */}
+        {isLoadingSetup ? (
           <div className="flex flex-col items-center justify-center p-24 space-y-3">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <p className="text-sm text-gray-500">Extracting verified projects and tech profiles...</p>
+            <p className="text-sm text-gray-500">Loading your profile & project database...</p>
           </div>
         ) : activeTab === 'progress' || viewMode === 'progress' ? (
           <ProgressTracker
             onStartNewSession={() => {
               setActiveTab('arena');
-              setViewMode('select');
+              setViewMode('setup');
             }}
             onSelectPastSession={handleSelectPastSession}
           />
-        ) : viewMode === 'select' ? (
-          <ProjectSelectModal
-            projects={projects}
-            targetRole={targetRole}
+        ) : viewMode === 'setup' ? (
+          <JobRoleSetupModal
+            allProjects={allProjects}
+            defaultRole={defaultRole}
+            availableRoles={availableRoles}
             onStartSession={handleStartSession}
             isStarting={isStarting}
           />
-        ) : viewMode === 'interview' && currentProject && currentSessionId ? (
+        ) : viewMode === 'interview' && currentSessionId ? (
           <InterviewChat
             sessionId={currentSessionId}
-            project={currentProject}
-            interviewerType={currentInterviewerType}
-            roleFocus={currentFocus}
-            initialMessages={currentMessages}
+            targetRole={targetRole}
+            seniority={seniority}
+            interviewerType={interviewerType}
+            relevantProjects={relevantProjects}
+            initialMessages={messages}
             suggestedFocusAreas={suggestedFocusAreas}
+            expectedTopics={expectedTopics}
             onFinishSession={handleFinishSession}
-            onBackToSelect={() => setViewMode('select')}
+            onBackToSelect={() => setViewMode('setup')}
             isFinishing={isFinishing}
           />
-        ) : viewMode === 'report' && evaluation && currentProject ? (
+        ) : viewMode === 'report' && evaluation ? (
           <EvaluationReport
             evaluation={evaluation}
-            project={currentProject}
             onRestart={() => {
-              setViewMode('select');
+              setViewMode('setup');
               setEvaluation(null);
             }}
             onViewHistory={() => {
@@ -252,12 +260,12 @@ export default function InterviewPage() {
           />
         ) : (
           <div className="p-12 text-center space-y-4">
-            <p className="text-gray-500 text-sm">Session state reset.</p>
+            <p className="text-gray-500 text-sm">Session state ready.</p>
             <button
-              onClick={() => setViewMode('select')}
+              onClick={() => setViewMode('setup')}
               className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold"
             >
-              Back to Selection
+              Start New Job Interview
             </button>
           </div>
         )}

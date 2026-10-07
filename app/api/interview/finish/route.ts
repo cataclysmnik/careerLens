@@ -3,11 +3,12 @@ import { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db/prisma';
 import {
-  evaluateInterviewSession,
-  extractStudentProjects,
+  evaluateRoleInterviewSession,
+  matchProjectsToRole,
+  type SeniorityLevel,
   type InterviewMessage,
+  type InterviewProject,
 } from '@/lib/interview/engine';
-import type { StoredEvidence } from '@/lib/evidence/student-evidence';
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -29,36 +30,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const [evidenceRow, profileRow] = await Promise.all([
-      prisma.studentEvidence.findUnique({ where: { userId: session.user.id } }),
-      prisma.profile.findUnique({
-        where: { userId: session.user.id },
-        select: { targetRole: true },
-      }),
-    ]);
-
-    const storedEvidence = (evidenceRow?.evidence as unknown as StoredEvidence) || null;
-    const allProjects = extractStudentProjects(storedEvidence);
-    const matchedProject =
-      allProjects.find(
-        (p) => p.title.toLowerCase() === interviewSession.projectTitle.toLowerCase()
-      ) ||
-      allProjects[0] || {
-        id: 'generic',
-        title: interviewSession.projectTitle,
-        description: 'Engineering project',
-        skills: [],
-        components: [],
-        architecturePatterns: [],
-        source: 'resume' as const,
-      };
+    const targetRole = interviewSession.roleTitle || 'Software Engineer';
+    const seniority = (interviewSession.seniority as SeniorityLevel) || 'entry';
+    const rawRelevant = (interviewSession.relevantProjects as unknown as InterviewProject[]) || [];
+    const roleSetup = matchProjectsToRole(targetRole, rawRelevant);
 
     const messages = (interviewSession.messages as unknown as InterviewMessage[]) || [];
 
-    const evaluation = await evaluateInterviewSession({
-      project: matchedProject,
+    const evaluation = await evaluateRoleInterviewSession({
+      targetRole,
+      seniority,
+      relevantProjects: roleSetup.relevantProjects,
       messages,
-      targetRole: profileRow?.targetRole,
     });
 
     const updatedSession = await prisma.interviewSession.update({
@@ -79,7 +62,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    console.error('Failed to evaluate and conclude session:', error);
+    console.error('Failed to evaluate role interview session:', error);
     return NextResponse.json({ error: 'Failed to evaluate interview session' }, { status: 500 });
   }
 }
