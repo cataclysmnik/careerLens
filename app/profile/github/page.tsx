@@ -9,6 +9,7 @@ type GithubResults = {
   username: string;
   totalRepos: number;
   evidence: GithubSkillEvidence[];
+  repositories: { name: string; description: string | null; stargazers_count: number; updated_at: string; language: string | null; topics: string[] }[];
 };
 
 export default function GithubIntegrationPage() {
@@ -117,6 +118,22 @@ export default function GithubIntegrationPage() {
               </button>
             </div>
 
+            {/* Contribution Graph */}
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 p-6 rounded-xl overflow-x-auto">
+              <h3 className="font-bold text-gray-900 dark:text-white mb-4">Contribution Activity</h3>
+              <div className="min-w-[700px]">
+                {/* 
+                  Using rshah's ghchart service which returns an SVG of the user's Github contribution graph.
+                  In dark mode, we append a hex color code to change the theme color.
+                */}
+                <img 
+                  src={`https://ghchart.rshah.org/${results.username}`} 
+                  alt={`${results.username}'s Github Chart`}
+                  className="w-full dark:invert dark:hue-rotate-180 opacity-90"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {results.evidence.map((ev, idx) => (
                 <details key={idx} className="group bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors [&_summary::-webkit-details-marker]:hidden">
@@ -181,6 +198,44 @@ export default function GithubIntegrationPage() {
                   </div>
                 </details>
               ))}
+            </div>
+
+            <div className="mt-10 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 p-6 rounded-xl">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-4">Latest Repositories</h3>
+              <div className="space-y-4">
+                {results.repositories && results.repositories.length > 0 ? (
+                  results.repositories.slice(0, 5).map((repo, idx) => (
+                    <div key={idx} className="p-4 border border-gray-200 dark:border-zinc-800 rounded-lg hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <a href={`https://github.com/${results.username}/${repo.name}`} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center gap-2">
+                          <Github className="w-4 h-4" />
+                          {repo.name}
+                        </a>
+                        {repo.language && (
+                          <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 rounded-full font-medium">
+                            {repo.language}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                        {repo.description || 'No description provided.'}
+                      </p>
+                      {repo.topics && repo.topics.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {repo.topics.slice(0, 4).map(topic => (
+                            <span key={topic} className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 rounded uppercase font-bold tracking-wider">
+                              {topic}
+                            </span>
+                          ))}
+                          {repo.topics.length > 4 && <span className="text-[10px] text-gray-400">+{repo.topics.length - 4}</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No repositories found or available.</p>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end mt-8">

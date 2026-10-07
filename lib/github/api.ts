@@ -28,7 +28,7 @@ export async function fetchUserRepositories(username: string): Promise<GithubRep
 
     const response = await fetch(`https://api.github.com/users/${username}/repos?per_page=100&sort=updated`, {
       headers,
-      next: { revalidate: 3600 } // Cache for 1 hour
+      cache: 'no-store' // Always fetch fresh data, ignore Next.js cache
     });
 
     if (!response.ok) {
@@ -57,8 +57,9 @@ export async function fetchUserRepositories(username: string): Promise<GithubRep
         const contentRes = await fetch(`https://api.github.com/repos/${username}/${repo.name}/contents`, {
           headers: {
             'Accept': 'application/vnd.github.v3+json',
+            ...(process.env.GITHUB_TOKEN ? { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } : {})
           },
-          next: { revalidate: 3600 }
+          cache: 'no-store'
         });
         
         if (contentRes.ok) {
@@ -67,8 +68,27 @@ export async function fetchUserRepositories(username: string): Promise<GithubRep
             repo.rootFiles = contents.map((c: any) => c.name);
           }
         }
+        
+        // If repo has no description, fetch the README snippet
+        if (!repo.description) {
+          const readmeRes = await fetch(`https://api.github.com/repos/${username}/${repo.name}/readme`, {
+            headers: {
+              'Accept': 'application/vnd.github.v3.raw',
+              ...(process.env.GITHUB_TOKEN ? { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } : {})
+            },
+            cache: 'no-store'
+          });
+          if (readmeRes.ok) {
+            const readmeText = await readmeRes.text();
+            // Extract first meaningful paragraph (ignoring headers like # RepoName)
+            const firstParagraph = readmeText.split('\n').find(line => line.trim().length > 20 && !line.startsWith('#') && !line.startsWith('['));
+            if (firstParagraph) {
+              repo.description = firstParagraph.trim().substring(0, 150) + '... (From README)';
+            }
+          }
+        }
       } catch (e) {
-        // Silently fail root file fetch, keep base repo data
+        // Silently fail root/readme file fetch, keep base repo data
       }
     }));
 

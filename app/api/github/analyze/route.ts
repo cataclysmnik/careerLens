@@ -23,7 +23,8 @@ export async function POST(req: Request) {
       data: {
         username,
         totalRepos: repos.length,
-        evidence
+        evidence,
+        repositories: repos
       }
     });
 
