@@ -83,6 +83,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Failed to start real-life job mock interview:', error);
-    return NextResponse.json({ error: 'Failed to start interview session' }, { status: 500 });
+    const detail = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: detail || 'Failed to start interview session' }, { status: 500 });
   }
 }

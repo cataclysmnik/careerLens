@@ -63,6 +63,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Failed to evaluate role interview session:', error);
-    return NextResponse.json({ error: 'Failed to evaluate interview session' }, { status: 500 });
+    const detail = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: detail || 'Failed to evaluate interview session' }, { status: 500 });
   }
 }

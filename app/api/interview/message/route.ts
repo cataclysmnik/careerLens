@@ -92,6 +92,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Failed to process interview message:', error);
-    return NextResponse.json({ error: 'Failed to process message' }, { status: 500 });
+    const detail = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: detail || 'Failed to process message' }, { status: 500 });
   }
 }
