@@ -27,6 +27,18 @@ function githubUsername(link: string | null): string | null {
   return name && name.length <= 39 ? name : null;
 }
 
+/** The most frequent non-empty value (ties: first seen). */
+function mostCommon(values: (string | null)[]): string | null {
+  const counts = new Map<string, { value: string; n: number }>();
+  for (const v of values) {
+    if (!v) continue;
+    const c = counts.get(v.toLowerCase()) ?? { value: v, n: 0 };
+    c.n++;
+    counts.set(v.toLowerCase(), c);
+  }
+  return [...counts.values()].sort((a, b) => b.n - a.n)[0]?.value ?? null;
+}
+
 function experienceLevel(profile: CandidateProfile): string | null {
   const exp = summarizeExperience(profile, new Date(profile.extractedAt));
   const studying = profile.education.some((e) => e.isOngoing);
@@ -41,7 +53,7 @@ function experienceLevel(profile: CandidateProfile): string | null {
 
 export type ProfileSyncResult = { updated: string[] };
 
-export async function syncProfileFromResume(userId: string, profile: CandidateProfile): Promise<ProfileSyncResult> {
+export async function syncProfileFromResume(userId: string, profile: CandidateProfile, extraLinks: string[] = []): Promise<ProfileSyncResult> {
   const existing = await prisma.profile.findUnique({ where: { userId } });
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
   const academics = summarizeAcademics(profile);
@@ -54,16 +66,20 @@ export async function syncProfileFromResume(userId: string, profile: CandidatePr
   if (academics.class12) update.twelfthPercentage = round2(academics.class12.percent);
 
   if (profile.location) update.location = profile.location.slice(0, 100);
-  // A GitHub username the student entered (or analyzed) stays; the resume only fills a blank.
-  const gh = githubUsername(profile.links.github);
-  if (gh && !existing?.githubUsername) update.githubUsername = gh;
+  // The resume's GitHub profile link, else the account that owns its project repos.
+  // A new resume replaces the saved username; one without GitHub links leaves it.
+  const gh = githubUsername(profile.links.github) ?? mostCommon(
+    [...profile.projects.map((p) => p.repoUrl), ...profile.links.other, ...extraLinks].map(githubUsername)
+  );
+  if (gh) update.githubUsername = gh;
   const portfolio = httpUrl(profile.links.portfolio);
   if (portfolio) update.portfolioUrl = portfolio;
   const linkedin = httpUrl(profile.links.linkedin);
   if (linkedin) update.linkedinUrl = linkedin;
 
+  // Coding handles the resume links replace the saved ones; platforms it doesn't mention stay.
   const handles = extractCodingHandles([
-    profile.links.github, profile.links.portfolio, profile.links.linkedin, ...profile.links.other,
+    profile.links.github, profile.links.portfolio, profile.links.linkedin, ...profile.links.other, ...extraLinks,
   ].filter((l): l is string => !!l));
   for (const p of CODING_PLATFORMS) if (handles[p]) update[HANDLE_FIELD[p]] = handles[p];
 

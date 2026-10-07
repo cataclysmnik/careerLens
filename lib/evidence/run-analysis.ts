@@ -81,8 +81,8 @@ export async function runFullAnalysis(
   }
 
   const found = findProfileLinks(profile, parsedLinks);
-  // A username saved on the account (entered in the GitHub Analyzer or My Profile) wins over the resume link.
-  const githubUsername = saved?.githubUsername ?? found.githubUsername ?? null;
+  // The resume's GitHub (profile link or project repo owner), else the one saved on the account.
+  const githubUsername = found.githubUsername ?? saved?.githubUsername ?? null;
   const portfolioUrl = found.portfolioUrl ?? saved?.portfolioUrl ?? null;
   const problems: string[] = [];
 
@@ -102,10 +102,9 @@ export async function runFullAnalysis(
     if (r.error) problems.push(`Portfolio ${portfolioUrl}: ${r.error}`);
   }
 
-  // Coding profiles linked on the resume, falling back to handles saved on the profile.
-  const handles: CodingHandles = {};
-  for (const p of CODING_PLATFORMS) if (saved?.[HANDLE_FIELD[p]]) handles[p] = saved[HANDLE_FIELD[p]]!;
-  Object.assign(handles, extractCodingHandles([...parsedLinks, ...profile.links.other]));
+  // Coding handles the resume links, plus saved ones for platforms it doesn't mention.
+  const handles: CodingHandles = extractCodingHandles([...parsedLinks, ...profile.links.other]);
+  for (const p of CODING_PLATFORMS) if (!handles[p] && saved?.[HANDLE_FIELD[p]]) handles[p] = saved[HANDLE_FIELD[p]]!;
 
   let coding: CodingProfileSummary | null = null;
   const platforms = Object.keys(handles) as (keyof CodingHandles)[];

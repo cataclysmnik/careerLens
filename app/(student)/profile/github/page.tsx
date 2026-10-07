@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { GitFork, Loader2, GitMerge, Search, ShieldCheck, RefreshCw } from 'lucide-react';
 import type { GithubSkillEvidence } from '@/lib/github/analyzer';
@@ -20,23 +20,7 @@ export default function GithubIntegrationPage() {
   const [analyzedAt, setAnalyzedAt] = useState<string | null>(null);
   const [loadingSaved, setLoadingSaved] = useState(true);
 
-  // Reopen with the username saved on the account and its last analysis.
-  useEffect(() => {
-    fetch('/api/github/analyze')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        const saved = json?.data;
-        if (saved?.username) setUsername(saved.username);
-        if (saved?.snapshot) {
-          setResults(saved.snapshot);
-          setAnalyzedAt(saved.snapshot.analyzedAt ?? null);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingSaved(false));
-  }, []);
-
-  const analyze = async (name: string) => {
+  const analyze = useCallback(async (name: string) => {
     setIsAnalyzing(true);
     setError(null);
     try {
@@ -54,7 +38,29 @@ export default function GithubIntegrationPage() {
     } finally {
       setIsAnalyzing(false);
     }
-  };
+  }, []);
+
+  // Reopen with the username saved on the account and its last analysis; a
+  // username found on the resume but never analyzed is analyzed straight away.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/github/analyze')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled) return;
+        const saved = json?.data;
+        if (saved?.username) setUsername(saved.username);
+        if (saved?.snapshot) {
+          setResults(saved.snapshot);
+          setAnalyzedAt(saved.snapshot.analyzedAt ?? null);
+        } else if (saved?.username) {
+          analyze(saved.username);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingSaved(false); });
+    return () => { cancelled = true; };
+  }, [analyze]);
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,8 +82,11 @@ export default function GithubIntegrationPage() {
       </header>
 
       <main className="mx-auto max-w-4xl p-6 mt-6 pb-24">
-        {loadingSaved ? (
-          <div className="flex justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
+        {loadingSaved || (isAnalyzing && !results) ? (
+          <div className="flex flex-col items-center gap-3 py-24 text-sm text-gray-500">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            {isAnalyzing && `Analyzing @${username}…`}
+          </div>
         ) : !results ? (
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-10 text-center flex flex-col items-center">
             <div className="w-16 h-16 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">

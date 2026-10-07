@@ -31,6 +31,34 @@ export const techDictionary = [
   'Git', 'Jira', 'Agile', 'Scrum', 'Figma', 'Jest', 'Cypress', 'Mocha', 'Selenium', 'CI/CD', 'Microservices', 'System Design'
 ];
 
+// Bare email-provider domains are never a candidate's link.
+const EMAIL_PROVIDERS = /^(gmail|googlemail|outlook|hotmail|live|yahoo|icloud|protonmail|proton|rediffmail|ymail|aol|zoho)\.(com|me|in|co\.in)$/i;
+
+/** host + path, lower-cased, without protocol, "www." or a trailing slash: the identity of a link. */
+function linkKey(url: string): string {
+  return url.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/#?]+$/, '');
+}
+
+/**
+ * Normalize links to https://, strip punctuation picked up from the text, drop
+ * email-provider domains, duplicates (www / no www, trailing slash) and links
+ * that are only a cut-off start of another link.
+ */
+export function cleanLinks(raw: string[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const link of raw) {
+    let url = link.trim().replace(/^[<(["']+/, '').replace(/[)\]>"'.,;:!]+$/, '');
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    const key = linkKey(url);
+    if (!key.includes('.') || EMAIL_PROVIDERS.test(key)) continue;
+    if (!byKey.has(key)) byKey.set(key, url);
+  }
+  const keys = [...byKey.keys()];
+  return keys
+    .filter((k) => !keys.some((other) => k.includes('/') && other.length > k.length && other.startsWith(k) && other[k.length] !== '/'))
+    .map((k) => byKey.get(k)!);
+}
+
 export function parseResumeDeterministic(text: string): ParsedResume {
   // Deterministic extraction
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
@@ -39,16 +67,13 @@ export function parseResumeDeterministic(text: string): ParsedResume {
   const linkRegex = /https?:\/\/[^\s]+|(?:www\.)?github\.com\/[^\s]+|(?:www\.)?linkedin\.com\/in\/[^\s]+|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]+\.(?:com|org|net|io|dev|me|co|app)\b(?:\/[^\s]*)?|[a-zA-Z0-9-]+\.(?:com|org|net|io|dev|me|co|app)\b(?:\/[^\s]*)?/gi;
   
   const emails = Array.from(new Set(text.match(emailRegex) || []));
-  
-  // Extract and normalize links to always have https://
-  const rawLinks = Array.from(new Set(text.match(linkRegex) || []));
-  const links = rawLinks.map(link => {
-    let cleanLink = link.replace(/[(),]/g, ''); // strip trailing punctuation
-    if (!cleanLink.startsWith('http')) {
-      cleanLink = 'https://' + cleanLink;
-    }
-    return cleanLink;
-  });
+
+  // Emails out first, or "name@gmail.com" yields a "gmail.com" link. Then rejoin
+  // links that PDF text extraction split across lines ("linkedin.com/in/abhiram-\nanil-123").
+  const linkText = text
+    .replace(emailRegex, ' ')
+    .replace(/((?:https?:\/\/|github\.com\/|linkedin\.com\/)\S*[-_])\s*\n\s*(?=[A-Za-z0-9])/gi, '$1');
+  const links = cleanLinks(linkText.match(linkRegex) || []);
 
   const detectedSkills = new Set<string>();
 

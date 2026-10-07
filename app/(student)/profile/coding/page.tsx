@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Trophy, Loader2, GitMerge, ShieldCheck, Star, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
-import type { Me } from '@/lib/types/me';
-import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO, type CodingHandles, type CodingPlatform } from '@/lib/coding/handles';
+import { Trophy, Loader2, ShieldCheck, Star, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
+import { CODING_PLATFORMS, PLATFORM_INFO, type CodingHandles, type CodingPlatform } from '@/lib/coding/handles';
 import type { CodingPlatformStats, CodingProfileSummary } from '@/lib/coding/analyzer';
 
 type Errors = Partial<Record<CodingPlatform, string>>;
@@ -17,48 +16,23 @@ const strengthClass = (strength: CodingProfileSummary['strength']) =>
 const cardClass = 'bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl';
 
 export default function CodingProfilesPage() {
-  const [me, setMe] = useState<Me | null>(null);
   const [handles, setHandles] = useState<CodingHandles>({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [platformErrors, setPlatformErrors] = useState<Errors>({});
   const [results, setResults] = useState<CodingProfileSummary | null>(null);
-  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
-  const [syncError, setSyncError] = useState('');
+  const [loadingSaved, setLoadingSaved] = useState(true);
 
-  // Prefill from the handles saved on the profile.
-  useEffect(() => {
-    fetch('/api/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (!json?.data) return;
-        const loaded: Me = json.data;
-        setMe(loaded);
-        const saved: CodingHandles = {};
-        CODING_PLATFORMS.forEach((p) => {
-          const h = loaded.profile?.[HANDLE_FIELD[p]];
-          if (h) saved[p] = h;
-        });
-        setHandles(saved);
-      })
-      .catch(() => {});
-  }, []);
-
-  const hasAnyHandle = CODING_PLATFORMS.some((p) => handles[p]?.trim());
-
-  const handleAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hasAnyHandle) return;
+  const analyze = useCallback(async (toAnalyze: CodingHandles) => {
     setIsAnalyzing(true);
     setError(null);
     setPlatformErrors({});
-    setSyncState('idle');
-
     try {
+      // The server saves the handles and updates the readiness report.
       const res = await fetch('/api/coding/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handles }),
+        body: JSON.stringify({ handles: toAnalyze }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Analysis failed');
@@ -70,37 +44,34 @@ export default function CodingProfilesPage() {
     } finally {
       setIsAnalyzing(false);
     }
-  };
+  }, []);
 
-  // Saves the analyzed handles to the profile and folds the results into the
-  // stored readiness report (recomputing the score).
-  const handleSync = async () => {
-    if (!results || !me) return;
-    setSyncState('syncing');
-    setSyncError('');
-    try {
-      const analyzedHandles = Object.fromEntries(results.platforms.map((p) => [HANDLE_FIELD[p.platform], p.handle]));
-      const meRes = await fetch('/api/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...me.profile, name: me.name, ...analyzedHandles }),
-      });
-      const meJson = await meRes.json();
-      if (!meRes.ok) throw new Error(meJson.error || 'Failed to save profile');
-      setMe(meJson.data);
+  // Reopen with the saved handles and last results. Handles found on the resume
+  // but never analyzed are analyzed straight away.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/coding/analyze')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled) return;
+        const saved: { handles: CodingHandles; summary: CodingProfileSummary | null } | undefined = json?.data;
+        const savedHandles = saved?.handles ?? {};
+        setHandles(savedHandles);
+        const analyzed = new Map(saved?.summary?.platforms.map((p) => [p.platform, p.handle.toLowerCase()]) ?? []);
+        const unanalyzed = CODING_PLATFORMS.some((p) => savedHandles[p] && analyzed.get(p) !== savedHandles[p]!.toLowerCase());
+        if (saved?.summary && !unanalyzed) setResults(saved.summary);
+        else if (Object.keys(savedHandles).length > 0) analyze(savedHandles);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingSaved(false); });
+    return () => { cancelled = true; };
+  }, [analyze]);
 
-      // The server re-scores the stored report with the new coding results.
-      const saveRes = await fetch('/api/students/evidence', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coding: results }),
-      });
-      if (!saveRes.ok) throw new Error((await saveRes.json()).error || 'Failed to update readiness report');
-      setSyncState('done');
-    } catch (err) {
-      setSyncError(err instanceof Error ? err.message : 'Sync failed');
-      setSyncState('error');
-    }
+  const hasAnyHandle = CODING_PLATFORMS.some((p) => handles[p]?.trim());
+
+  const handleAnalyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasAnyHandle) await analyze(handles);
   };
 
   const errorList = Object.entries(platformErrors) as [CodingPlatform, string][];
@@ -118,7 +89,12 @@ export default function CodingProfilesPage() {
       </header>
 
       <main className="mx-auto max-w-4xl p-6 mt-6 pb-24">
-        {!results ? (
+        {loadingSaved || (isAnalyzing && !results) ? (
+          <div className="flex flex-col items-center gap-3 py-24 text-sm text-gray-500">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            {isAnalyzing && 'Analyzing your coding profiles…'}
+          </div>
+        ) : !results ? (
           <div className={`${cardClass} p-10 flex flex-col items-center text-center`}>
             <div className="w-16 h-16 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
               <Trophy className="w-8 h-8 text-gray-700 dark:text-gray-300" />
@@ -170,12 +146,22 @@ export default function CodingProfilesPage() {
                   {results.platforms.length === 1 ? 'platform' : 'platforms'}
                 </p>
               </div>
-              <button
-                onClick={() => { setResults(null); setSyncState('idle'); }}
-                className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-              >
-                Edit Profiles
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => analyze(Object.fromEntries(results.platforms.map((p) => [p.platform, p.handle])))}
+                  disabled={isAnalyzing}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                >
+                  {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Re-analyze
+                </button>
+                <button
+                  onClick={() => { setResults(null); setError(null); }}
+                  disabled={isAnalyzing}
+                  className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                >
+                  Edit Profiles
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -208,23 +194,9 @@ export default function CodingProfilesPage() {
               {results.platforms.map((p) => <PlatformCard key={p.platform} stats={p} />)}
             </div>
 
-            <div className="flex flex-col items-end gap-2 mt-8">
-              <button
-                onClick={handleSync}
-                disabled={syncState === 'syncing' || syncState === 'done' || !me}
-                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors shadow-sm"
-              >
-                {syncState === 'syncing' ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                  syncState === 'done' ? <CheckCircle2 className="w-4 h-4" /> : <GitMerge className="w-4 h-4" />}
-                {syncState === 'done' ? 'Synced to Profile' : 'Sync Evidence to Profile'}
-              </button>
-              {syncState === 'done' && (
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  Saved. Your readiness score now includes these results. <Link href="/dashboard" className="underline">View dashboard</Link>
-                </p>
-              )}
-              {syncState === 'error' && <p className="text-sm text-red-600">{syncError}</p>}
-            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-right mt-8">
+              Saved to your account and included in your readiness score. <Link href="/dashboard" className="underline">View dashboard</Link>
+            </p>
           </div>
         )}
       </main>
