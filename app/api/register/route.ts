@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import bcrypt from "bcryptjs"
+import { initialStatusFor, parseRole } from "@/lib/accountStatus"
 
 export async function POST(req: Request) {
   try {
-    const { email, password, name } = await req.json()
-    
+    const { email, password, name, role } = await req.json()
+
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 })
     }
+
+    const requestedRole = parseRole(role)
 
     const existingUser = await prisma.user.findUnique({
       where: { email }
@@ -19,20 +22,21 @@ export async function POST(req: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10)
+    const status = await initialStatusFor(requestedRole)
 
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         email,
         name,
         password: hashedPassword,
-        profile: {
-          create: {} // create an empty profile for the user
-        }
+        role: requestedRole,
+        status,
+        ...(requestedRole === "STUDENT" && { profile: { create: {} } }),
       }
     })
 
-    return NextResponse.json({ success: true }, { status: 201 })
-  } catch (error) {
+    return NextResponse.json({ success: true, status }, { status: 201 })
+  } catch {
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 })
   }
 }

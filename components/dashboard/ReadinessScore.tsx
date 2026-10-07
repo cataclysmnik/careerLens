@@ -1,6 +1,15 @@
 import React from 'react';
+import { readinessTier, TIER_BADGE_CLASS, TIER_LABEL, type ReadinessTier } from '@/lib/readiness';
+
+const TIER_MESSAGE: Record<ReadinessTier, string> = {
+  READY: 'Your profile shows strong, verifiable evidence for placement.',
+  DEVELOPING: 'A solid base — closing the gaps below will lift your score fastest.',
+  NEEDS_SUPPORT: 'Add more evidence — projects, GitHub and a portfolio — to build your score.',
+  NOT_ANALYZED: 'Run an analysis to get your score.',
+};
 
 export function ReadinessScore({ score }: { score: number }) {
+  const tier = readinessTier(score);
   // Simple SVG circle for readiness score
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
@@ -39,8 +48,11 @@ export function ReadinessScore({ score }: { score: number }) {
         </div>
       </div>
       
-      <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
-        Your profile demonstrates strong alignment with mid-level engineering roles.
+      <span className={`mt-4 px-2 py-0.5 rounded text-xs font-semibold uppercase ${TIER_BADGE_CLASS[tier]}`}>
+        {TIER_LABEL[tier]}
+      </span>
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">
+        {TIER_MESSAGE[tier]}
       </p>
     </div>
   );

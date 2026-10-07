@@ -6,7 +6,7 @@ export async function extractTextFromFile(buffer: Buffer, mimeType: string): Pro
   try {
     if (mimeType === 'application/pdf') {
       return new Promise((resolve, reject) => {
-        const pdfParser = new PDFParser(null, 1);
+        const pdfParser = new PDFParser(null, true);
         
         pdfParser.on("pdfParser_dataError", (errData: any) => {
           console.error("pdf2json error:", errData.parserError);
