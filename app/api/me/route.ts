@@ -52,7 +52,10 @@ export async function GET() {
   if (!me) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
-  return NextResponse.json({ data: me })
+  return NextResponse.json(
+    { data: me },
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  )
 }
 
 function optionalText(value: unknown, max: number): string | null {

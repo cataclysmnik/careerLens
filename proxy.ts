@@ -86,14 +86,19 @@ export default auth(async (req) => {
   // only controls this redirect; the APIs never trust it.
   const setupCookie = `cl_setup_${req.auth.user.id}`;
   if (isStudentArea && role === "STUDENT" && !pathname.startsWith(RESUME_PATH) && !req.cookies.has(setupCookie)) {
-    const evidence = await prisma.studentEvidence.findUnique({
-      where: { userId: req.auth.user.id },
-      select: { id: true },
-    });
-    if (!evidence) return NextResponse.redirect(new URL(RESUME_PATH, req.nextUrl));
-    const res = NextResponse.next();
-    res.cookies.set(setupCookie, "1", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
-    return res;
+    try {
+      const evidence = await prisma.studentEvidence.findUnique({
+        where: { userId: req.auth.user.id },
+        select: { id: true },
+      });
+      if (!evidence) return NextResponse.redirect(new URL(RESUME_PATH, req.nextUrl));
+      const res = NextResponse.next();
+      res.cookies.set(setupCookie, "1", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+      return res;
+    } catch (e) {
+      console.error("Proxy evidence check error:", e);
+      return NextResponse.next();
+    }
   }
 
   return NextResponse.next();

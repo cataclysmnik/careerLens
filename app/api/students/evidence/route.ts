@@ -43,10 +43,18 @@ export async function POST(req: Request) {
       update: data,
     });
 
-    return NextResponse.json({ success: true, data: { scoring } });
+    const response = NextResponse.json({ success: true, data: { scoring } });
+    response.cookies.set(`cl_setup_${session.user.id}`, "1", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+    return response;
   } catch (error: unknown) {
     console.error("Failed to persist student evidence:", error);
-    return NextResponse.json({ error: "Failed to save evidence" }, { status: 500 });
+    const detail = error instanceof Error ? error.message : "Failed to save evidence";
+    return NextResponse.json({ error: "Failed to save evidence", detail }, { status: 500 });
   }
 }
 

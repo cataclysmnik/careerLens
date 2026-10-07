@@ -24,13 +24,30 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
   // Until the first resume analysis is saved, only the Resume Parser is shown.
   const [hasAnalysis, setHasAnalysis] = useState<boolean | null>(null);
 
+  const checkAnalysis = React.useCallback(() => {
+    fetch('/api/me', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.data) {
+          setHasAnalysis(!!json.data.hasAnalysis);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (hasAnalysis) return;
-    fetch('/api/me')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => setHasAnalysis(!!json?.data?.hasAnalysis))
-      .catch(() => {});
-  }, [pathname, hasAnalysis]);
+    checkAnalysis();
+  }, [pathname, hasAnalysis, checkAnalysis]);
+
+  useEffect(() => {
+    const onAnalysisUpdated = () => {
+      setHasAnalysis(true);
+      checkAnalysis();
+    };
+    window.addEventListener('careerlens:analysis-updated', onAnalysisUpdated);
+    return () => window.removeEventListener('careerlens:analysis-updated', onAnalysisUpdated);
+  }, [checkAnalysis]);
 
   const visibleItems = hasAnalysis ? navItems : navItems.filter((item) => item.href === RESUME_HREF);
 

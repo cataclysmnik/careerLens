@@ -39,7 +39,7 @@ export default function ResumeUploadPage() {
   const [analysisProblems, setAnalysisProblems] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch('/api/me')
+    fetch('/api/me', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => setHasAnalysis(!!json?.data?.hasAnalysis))
       .catch(() => setHasAnalysis(false));
@@ -99,6 +99,11 @@ export default function ResumeUploadPage() {
       const result = await runFullAnalysis(profile, parsedData.links, (step, detail) =>
         setAnalysis((a) => ({ step, detail, seen: [...(a?.seen ?? []), step] }))
       );
+      setHasAnalysis(true);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('careerlens:analysis-updated'));
+      }
+      router.refresh();
       if (result.problems.length) {
         // Saved anyway; let the student see what was skipped before moving on.
         setAnalysisProblems(result.problems);
