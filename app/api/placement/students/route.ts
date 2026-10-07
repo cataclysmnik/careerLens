@@ -15,6 +15,7 @@ export async function GET(req: Request) {
   const minScore = Number(searchParams.get("minScore") ?? 0);
   const hasPortfolio = searchParams.get("hasPortfolio");
   const targetRole = searchParams.get("targetRole");
+  const minCgpa = Number(searchParams.get("minCgpa") ?? 0);
 
   const students = await prisma.user.findMany({
     where: { role: "STUDENT" },
@@ -38,6 +39,25 @@ export async function GET(req: Request) {
       githubUsername: s.profile?.githubUsername ?? null,
       portfolioUrl: s.profile?.portfolioUrl ?? null,
       linkedinUrl: s.profile?.linkedinUrl ?? null,
+      cgpa: s.profile?.cgpa ?? null,
+      tenthPercentage: s.profile?.tenthPercentage ?? null,
+      twelfthPercentage: s.profile?.twelfthPercentage ?? null,
+      coding: evidence?.coding
+        ? {
+            overallScore: evidence.coding.overallScore,
+            strength: evidence.coding.strength,
+            totalSolved: evidence.coding.totalSolved,
+            bestRating: evidence.coding.bestRating,
+            platforms: evidence.coding.platforms.map((p) => ({
+              platform: p.platform,
+              handle: p.handle,
+              profileUrl: p.profileUrl,
+              problemsSolved: p.problemsSolved,
+              rating: p.rating,
+              rank: p.rank,
+            })),
+          }
+        : null,
       overallScore,
       tier: readinessTier(overallScore),
       evidenceStrength: scoring?.evidenceStrength ?? null,
@@ -55,6 +75,7 @@ export async function GET(req: Request) {
     if (minScore > 0 && (r.overallScore === null || r.overallScore < minScore)) return false;
     if (hasPortfolio === "true" && !r.hasPortfolio) return false;
     if (targetRole && r.targetRole !== targetRole) return false;
+    if (minCgpa > 0 && (r.cgpa === null || r.cgpa < minCgpa)) return false;
     return true;
   });
 

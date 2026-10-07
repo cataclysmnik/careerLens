@@ -9,6 +9,14 @@ export type MeProfile = {
   githubUsername: string | null
   portfolioUrl: string | null
   linkedinUrl: string | null
+  cgpa: number | null
+  tenthPercentage: number | null
+  twelfthPercentage: number | null
+  leetcodeUsername: string | null
+  codeforcesHandle: string | null
+  codechefUsername: string | null
+  hackerrankUsername: string | null
+  gfgUsername: string | null
 }
 
 export type Me = {

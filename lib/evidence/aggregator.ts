@@ -2,6 +2,7 @@
 import type { ParsedResume } from './parsers/resume-parser';
 import type { GithubSkillEvidence } from '../github/analyzer';
 import type { PortfolioEvidence } from '../portfolio/analyzer';
+import type { CodingProfileSummary } from '../coding/analyzer';
 
 export type UnifiedSkill = {
   name: string;
@@ -25,12 +26,15 @@ export type UnifiedEvidence = {
     emails: string[];
     links: string[];
   };
+  // Optional so evidence saved before coding profiles existed still parses.
+  coding?: CodingProfileSummary | null;
 };
 
 export function aggregateEvidence(
   resume: ParsedResume | null,
   github: { totalRepos: number, evidence: GithubSkillEvidence[] } | null,
-  portfolio: PortfolioEvidence | null
+  portfolio: PortfolioEvidence | null,
+  coding: CodingProfileSummary | null = null
 ): UnifiedEvidence {
   const skillMap = new Map<string, UnifiedSkill>();
 
@@ -127,6 +131,7 @@ export function aggregateEvidence(
     contactInfo: {
       emails: resume?.emails || [],
       links: resume?.links || []
-    }
+    },
+    coding
   };
 }

@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
   Loader2, GitFork, Globe, Search, ChevronDown, Link2, MapPin, Briefcase,
-  CheckCircle2, AlertTriangle, Send, X,
+  CheckCircle2, AlertTriangle, Send, X, Trophy, GraduationCap,
 } from 'lucide-react';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import {
   TIER_BADGE_CLASS, TIER_LABEL, TIER_ORDER, scoreTextClass, type ReadinessTier,
 } from '@/lib/readiness';
+import { PLATFORM_INFO, type CodingPlatform } from '@/lib/coding/handles';
 
 type StudentRow = {
   id: string;
@@ -24,6 +25,16 @@ type StudentRow = {
   githubUsername: string | null;
   portfolioUrl: string | null;
   linkedinUrl: string | null;
+  cgpa: number | null;
+  tenthPercentage: number | null;
+  twelfthPercentage: number | null;
+  coding: {
+    overallScore: number;
+    strength: 'Strong' | 'Moderate' | 'Weak';
+    totalSolved: number;
+    bestRating: { platform: CodingPlatform; rating: number } | null;
+    platforms: { platform: CodingPlatform; handle: string; profileUrl: string; problemsSolved: number | null; rating: number | null; rank: string | null }[];
+  } | null;
   overallScore: number | null;
   tier: ReadinessTier;
   evidenceStrength: number | null;
@@ -36,7 +47,9 @@ type StudentRow = {
   updatedAt: string | null;
 };
 
-type SortKey = 'score-desc' | 'score-asc' | 'name' | 'recent';
+type SortKey = 'score-desc' | 'score-asc' | 'cgpa-desc' | 'name' | 'recent';
+
+const CGPA_CUTOFFS = [6, 6.5, 7, 7.5, 8, 8.5, 9];
 
 const controlClass =
   'px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -65,6 +78,8 @@ function StudentsView() {
   const [role, setRole] = useState('ALL');
   const [needGithub, setNeedGithub] = useState(false);
   const [needPortfolio, setNeedPortfolio] = useState(false);
+  const [needCoding, setNeedCoding] = useState(false);
+  const [minCgpa, setMinCgpa] = useState(0);
   const [sort, setSort] = useState<SortKey>('score-desc');
   const [expanded, setExpanded] = useState<string | null>(searchParams.get('student'));
 
@@ -88,25 +103,28 @@ function StudentsView() {
       if (role !== 'ALL' && s.targetRole !== role) return false;
       if (needGithub && !s.hasGithub) return false;
       if (needPortfolio && !s.hasPortfolio) return false;
+      if (needCoding && !s.coding) return false;
+      if (minCgpa > 0 && (s.cgpa === null || s.cgpa < minCgpa)) return false;
       return true;
     });
     const score = (s: StudentRow) => s.overallScore ?? -1;
     return rows.sort((a, b) => {
       if (sort === 'score-desc') return score(b) - score(a);
       if (sort === 'score-asc') return (a.overallScore ?? 101) - (b.overallScore ?? 101);
+      if (sort === 'cgpa-desc') return (b.cgpa ?? -1) - (a.cgpa ?? -1);
       if (sort === 'name') return (a.name || a.email || '').localeCompare(b.name || b.email || '');
       return (b.updatedAt ? Date.parse(b.updatedAt) : 0) - (a.updatedAt ? Date.parse(a.updatedAt) : 0);
     });
-  }, [students, search, tier, role, needGithub, needPortfolio, sort]);
+  }, [students, search, tier, role, needGithub, needPortfolio, needCoding, minCgpa, sort]);
 
   if (loadError) {
     return <div className="p-10 text-center text-sm text-red-500">Couldn&apos;t load students. Refresh the page to try again.</div>;
   }
   if (!students) return <FullPageSpinner />;
 
-  const filtersActive = search || tier !== 'ALL' || role !== 'ALL' || needGithub || needPortfolio;
+  const filtersActive = search || tier !== 'ALL' || role !== 'ALL' || needGithub || needPortfolio || needCoding || minCgpa > 0;
   const clearFilters = () => {
-    setSearch(''); setTier('ALL'); setRole('ALL'); setNeedGithub(false); setNeedPortfolio(false);
+    setSearch(''); setTier('ALL'); setRole('ALL'); setNeedGithub(false); setNeedPortfolio(false); setNeedCoding(false); setMinCgpa(0);
   };
 
   return (
@@ -146,14 +164,20 @@ function StudentsView() {
             <option value="ALL">All target roles</option>
             {roles.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
+          <select value={minCgpa} onChange={(e) => setMinCgpa(Number(e.target.value))} className={controlClass} aria-label="Minimum CGPA">
+            <option value={0}>Any CGPA</option>
+            {CGPA_CUTOFFS.map((c) => <option key={c} value={c}>CGPA ≥ {c}</option>)}
+          </select>
           <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={controlClass} aria-label="Sort">
             <option value="score-desc">Highest score</option>
             <option value="score-asc">Lowest score</option>
+            <option value="cgpa-desc">Highest CGPA</option>
             <option value="recent">Recently analyzed</option>
             <option value="name">Name A–Z</option>
           </select>
           <Toggle checked={needGithub} onChange={setNeedGithub} icon={GitFork} label="Has GitHub" />
           <Toggle checked={needPortfolio} onChange={setNeedPortfolio} icon={Globe} label="Has portfolio" />
+          <Toggle checked={needCoding} onChange={setNeedCoding} icon={Trophy} label="Has coding profile" />
           {filtersActive && (
             <button onClick={clearFilters} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white">
               <X className="w-4 h-4" /> Clear
@@ -168,6 +192,7 @@ function StudentsView() {
                 <tr>
                   <th className="text-left px-4 py-3">Student</th>
                   <th className="text-left px-4 py-3">Target Role</th>
+                  <th className="text-left px-4 py-3">CGPA</th>
                   <th className="text-left px-4 py-3">Score</th>
                   <th className="text-left px-4 py-3">Readiness</th>
                   <th className="text-left px-4 py-3">Evidence</th>
@@ -194,6 +219,7 @@ function StudentsView() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{s.targetRole ?? '—'}</td>
+                        <td className="px-4 py-3 font-medium">{s.cgpa ?? <span className="text-gray-400 font-normal">—</span>}</td>
                         <td className="px-4 py-3">
                           {s.overallScore !== null ? (
                             <span className={`font-bold ${scoreTextClass(s.overallScore)}`}>{s.overallScore}</span>
@@ -210,7 +236,8 @@ function StudentsView() {
                           <div className="flex gap-2 text-gray-400">
                             {s.hasGithub && <span title="GitHub evidence"><GitFork className="w-4 h-4" /></span>}
                             {s.hasPortfolio && <span title="Portfolio evidence"><Globe className="w-4 h-4" /></span>}
-                            {!s.hasGithub && !s.hasPortfolio && <span className="text-xs">—</span>}
+                            {s.coding && <span title={`Coding profiles: ${s.coding.totalSolved} solved`}><Trophy className="w-4 h-4" /></span>}
+                            {!s.hasGithub && !s.hasPortfolio && !s.coding && <span className="text-xs">—</span>}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 max-w-[220px] truncate">{s.gaps[0]?.title ?? '—'}</td>
@@ -220,7 +247,7 @@ function StudentsView() {
                       </tr>
                       {isOpen && (
                         <tr className="bg-gray-50/60 dark:bg-zinc-950/40">
-                          <td colSpan={7} className="px-4 py-5">
+                          <td colSpan={8} className="px-4 py-5">
                             <StudentDetail s={s} />
                           </td>
                         </tr>
@@ -230,7 +257,7 @@ function StudentsView() {
                 })}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-gray-400 text-sm">
+                    <td colSpan={8} className="px-4 py-10 text-center text-gray-400 text-sm">
                       {students.length === 0 ? 'No students have registered yet.' : 'No students match these filters.'}
                     </td>
                   </tr>
@@ -289,6 +316,62 @@ function StudentDetail({ s }: { s: StudentRow }) {
           </a>
         ))}
       </div>
+
+      {(s.cgpa !== null || s.tenthPercentage !== null || s.twelfthPercentage !== null || s.coding) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1.5">
+              <GraduationCap className="w-4 h-4" /> Academics
+            </h4>
+            <dl className="grid grid-cols-3 gap-2 text-center">
+              {[
+                { label: 'CGPA', value: s.cgpa, suffix: '' },
+                { label: '12th', value: s.twelfthPercentage, suffix: '%' },
+                { label: '10th', value: s.tenthPercentage, suffix: '%' },
+              ].map((a) => (
+                <div key={a.label} className="rounded-lg bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 py-2">
+                  <dd className="font-bold">{a.value !== null ? `${a.value}${a.suffix}` : '—'}</dd>
+                  <dt className="text-xs text-gray-500">{a.label}</dt>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <div className="lg:col-span-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1.5">
+              <Trophy className="w-4 h-4" /> Coding Profiles
+            </h4>
+            {s.coding ? (
+              <>
+                <p className="text-sm mb-2">
+                  <span className={`font-bold ${scoreTextClass(s.coding.overallScore)}`}>{s.coding.overallScore}/100</span>
+                  <span className="text-gray-500"> problem-solving · {s.coding.totalSolved} solved</span>
+                  {s.coding.bestRating && <span className="text-gray-500"> · best rating {s.coding.bestRating.rating} ({PLATFORM_INFO[s.coding.bestRating.platform].label})</span>}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {s.coding.platforms.map((p) => (
+                    <a
+                      key={p.platform}
+                      href={p.profileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-xs hover:border-blue-300"
+                    >
+                      <span className="font-semibold">{PLATFORM_INFO[p.platform].label}</span>
+                      <span className="text-gray-500">
+                        {p.problemsSolved !== null && ` · ${p.problemsSolved} solved`}
+                        {p.rank && ` · ${p.rank}`}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">No coding profiles analyzed yet.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {s.overallScore === null ? (
         <p className="text-sm text-gray-500">This student hasn&apos;t run a resume analysis yet, so there&apos;s no readiness breakdown.</p>

@@ -61,7 +61,13 @@ export function calculateReadiness(evidence: UnifiedEvidence): ScoringResult {
 
   // Experience & Problem Solving (Heuristics based on total repo volume and case studies)
   experience = Math.min(evidence.totalGithubRepos * 5, 80) + (evidence.hasCaseStudies ? 20 : 0);
-  problemSolving = evidence.hasCaseStudies ? 95 : 60;
+  // Coding-platform results are direct evidence of problem solving, so when
+  // present they outweigh the case-study heuristic.
+  const coding = evidence.coding;
+  const caseStudySignal = evidence.hasCaseStudies ? 95 : 60;
+  problemSolving = coding
+    ? Math.round(coding.overallScore * 0.8 + caseStudySignal * 0.2)
+    : caseStudySignal;
 
   // Overall Score
   const categories = [
@@ -111,11 +117,23 @@ export function calculateReadiness(evidence: UnifiedEvidence): ScoringResult {
     actions.push({ title: "Publish More Code", description: "Open source some of your local projects or contribute to public repos.", impact: "Medium Impact" });
   }
 
+  if (!coding) {
+    gaps.push({ title: "No Coding Profile", description: "No LeetCode, Codeforces, CodeChef, HackerRank or GeeksforGeeks profile to verify problem-solving skills." });
+    actions.push({ title: "Practice on a Coding Platform", description: "Solve problems regularly on LeetCode or Codeforces and add the profile to CareerLens. Most placement tests are DSA-based.", impact: "High Impact" });
+  } else if (coding.strength === 'Strong') {
+    const rating = coding.bestRating ? `, best contest rating ${coding.bestRating.rating}` : '';
+    strengths.push({ title: "Strong Problem Solver", description: `${coding.totalSolved} problems solved across coding platforms${rating}.` });
+  } else {
+    gaps.push({ title: "Limited Problem-Solving Practice", description: `${coding.totalSolved} problems solved so far; placement tests usually need consistent DSA practice.` });
+    actions.push({ title: "Build a DSA Practice Habit", description: "Aim for 3–5 medium problems a week and take part in rated contests.", impact: "Medium Impact" });
+  }
+
   // Evidence Strength (How much data did we have to work with?)
   let evidenceStrength = 20;
   if (evidence.skills.length > 0) evidenceStrength += 30;
   if (evidence.hasGithub) evidenceStrength += 30;
   if (evidence.hasPortfolio) evidenceStrength += 20;
+  if (coding) evidenceStrength = Math.min(evidenceStrength + 10, 100);
 
   return {
     overallScore,
