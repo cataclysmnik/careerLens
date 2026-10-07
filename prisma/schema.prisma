@@ -47,6 +47,7 @@ model User {
   jobListings         JobListing[]          @relation("CompanyListings")
   reviewedListings    JobListing[]          @relation("ListingReviewer")
   applications        JobApplication[]
+  interviewSessions   InterviewSession[]
 }
 
 model PasswordResetToken {
@@ -147,4 +148,25 @@ model JobApplication {
 
   @@unique([listingId, studentId])
   @@index([studentId])
+}
+
+model InterviewSession {
+  id              String   @id @default(cuid())
+  userId          String
+  projectTitle    String
+  roleFocus       String?
+  interviewerType String   @default("tech_lead") // tech_lead, bar_raiser, friendly
+  status          String   @default("in_progress") // in_progress, completed
+  overallScore    Int?     // 0-100
+  metrics         Json?    // { technicalDepth: 85, clarity: 90, architecture: 80, problemSolving: 75 }
+  messages        Json     // Array of { id, role, content, timestamp, feedback }
+  feedback        Json?    // { summary, strengths, areasToImprove, keyTakeaways }
+  resumeRewrites  Json?    // Array of { originalPoint, suggestedRewrite, impactMetric, reasoning, tags }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
