@@ -2,9 +2,11 @@
 
 import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { UploadCloud, FileText, Loader2, GitFork, Globe, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, GitFork, Globe, CheckCircle2, Trophy } from 'lucide-react';
 import { aggregateEvidence } from '@/lib/evidence/aggregator';
 import { calculateReadiness } from '@/lib/scoring/engine';
+import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO, extractCodingHandles, type CodingHandles } from '@/lib/coding/handles';
+import type { CodingProfileSummary } from '@/lib/coding/analyzer';
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -12,7 +14,7 @@ export default function OnboardingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [scrapedData, setScrapedData] = useState<{ github: any, portfolio: any } | null>(null);
+  const [scrapedData, setScrapedData] = useState<{ github: any, portfolio: any, coding: CodingProfileSummary | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -121,13 +123,43 @@ export default function OnboardingPage() {
         }
       }
 
-      setStep(5);
+      // Step 4: Coding profiles linked on the resume, falling back to the
+      // handles saved on the profile.
+      let codingData: CodingProfileSummary | null = null;
+      const codingHandles: CodingHandles = {};
+      try {
+        const meRes = await fetch('/api/me');
+        const profile = meRes.ok ? (await meRes.json()).data?.profile : null;
+        CODING_PLATFORMS.forEach((p) => {
+          if (profile?.[HANDLE_FIELD[p]]) codingHandles[p] = profile[HANDLE_FIELD[p]];
+        });
+      } catch {
+        // Saved handles are optional.
+      }
+      Object.assign(codingHandles, extractCodingHandles(parsedResume.links ?? []));
+
+      if (Object.keys(codingHandles).length > 0) {
+        setStep(5);
+        setStatusText(`Analyzing coding profiles: ${Object.keys(codingHandles).map((p) => PLATFORM_INFO[p as keyof typeof PLATFORM_INFO].label).join(', ')}...`);
+        try {
+          const codingRes = await fetch('/api/coding/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ handles: codingHandles })
+          });
+          if (codingRes.ok) codingData = (await codingRes.json()).data;
+        } catch (e) {
+          console.error("Coding profile analysis failed in pipeline", e);
+        }
+      }
+
+      setStep(6);
       setStatusText('Career Readiness Model Generated!');
 
       // Persist to the server so the dashboard, placement cell, and future
       // devices/browsers can all see this student's evidence and score.
       try {
-        const unifiedEvidence = aggregateEvidence(parsedResume, githubData, portfolioData);
+        const unifiedEvidence = aggregateEvidence(parsedResume, githubData, portfolioData, codingData);
         const scoring = calculateReadiness(unifiedEvidence);
         await fetch('/api/students/evidence', {
           method: 'POST',
@@ -140,7 +172,8 @@ export default function OnboardingPage() {
 
       setScrapedData({
         github: githubData,
-        portfolio: portfolioData
+        portfolio: portfolioData,
+        coding: codingData
       });
 
     } catch (err: any) {
@@ -212,7 +245,7 @@ export default function OnboardingPage() {
         ) : (
           <div className="py-8">
             <div className="flex flex-col items-center justify-center mb-8">
-              {step < 5 ? (
+              {step < 6 ? (
                 <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
               ) : (
                 <CheckCircle2 className="w-12 h-12 text-green-500 mb-4" />
@@ -225,7 +258,8 @@ export default function OnboardingPage() {
                 <StepIndicator icon={FileText} title="Parsing Resume" active={step >= 2} completed={step > 2} />
                 <StepIndicator icon={GitFork} title="GitHub Analysis" active={step >= 3} completed={step > 3} />
                 <StepIndicator icon={Globe} title="Portfolio Scanning" active={step >= 4} completed={step > 4} />
-                <StepIndicator icon={CheckCircle2} title="Finalizing Profile" active={step >= 5} completed={step > 5} />
+                <StepIndicator icon={Trophy} title="Coding Profiles" active={step >= 5} completed={step > 5} />
+                <StepIndicator icon={CheckCircle2} title="Finalizing Profile" active={step >= 6} completed={step > 6} />
               </div>
             ) : (
               <div className="space-y-6 w-full text-left">
@@ -264,6 +298,26 @@ export default function OnboardingPage() {
                         <div className="text-xs text-gray-500 uppercase font-bold mb-1">A11y Score</div>
                         <div className="text-lg font-bold">{scrapedData.portfolio.accessibilityScore}/100</div>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {scrapedData.coding && (
+                  <div className="p-4 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl">
+                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+                      <Trophy className="w-5 h-5" /> Coding Profiles
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      <span className="font-bold">{scrapedData.coding.totalSolved}</span> problems solved
+                      {scrapedData.coding.bestRating && <> · best rating <span className="font-bold">{scrapedData.coding.bestRating.rating}</span></>}
+                      {' '}· problem-solving score <span className="font-bold">{scrapedData.coding.overallScore}/100</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {scrapedData.coding.platforms.map((p) => (
+                        <span key={p.platform} className="px-2.5 py-1 text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-sm">
+                          {PLATFORM_INFO[p.platform].label} @{p.handle}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}

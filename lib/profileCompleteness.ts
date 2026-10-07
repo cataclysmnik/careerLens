@@ -8,7 +8,12 @@ export function profileChecklist(me: Me) {
     { label: "Experience level", done: !!p?.experienceLevel },
     { label: "Location", done: !!p?.location },
     { label: "Skills", done: (p?.skills.length ?? 0) > 0 },
+    { label: "Academics (CGPA)", done: p?.cgpa != null },
     { label: "GitHub", done: !!p?.githubUsername },
+    {
+      label: "Coding profile",
+      done: !!(p?.leetcodeUsername || p?.codeforcesHandle || p?.codechefUsername || p?.hackerrankUsername || p?.gfgUsername),
+    },
     { label: "Portfolio", done: !!p?.portfolioUrl },
     { label: "LinkedIn", done: !!p?.linkedinUrl },
   ]

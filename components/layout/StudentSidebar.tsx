@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, GitFork, Globe, User, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileText, GitFork, Globe, User, Briefcase, Trophy } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { SidebarUserCard } from './SidebarUserCard';
 
@@ -14,6 +14,7 @@ const navItems = [
   { name: 'My Profile', href: '/profile', icon: User },
   { name: 'Resume Parser', href: '/profile/resume', icon: FileText },
   { name: 'GitHub Analyzer', href: '/profile/github', icon: GitFork },
+  { name: 'Coding Profiles', href: '/profile/coding', icon: Trophy },
   { name: 'Portfolio Scanner', href: '/profile/portfolio', icon: Globe },
 ];
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db/prisma"
+import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO, parseCodingHandle } from "@/lib/coding/handles"
 
 const USER_SELECT = {
   id: true,
@@ -21,6 +22,14 @@ const USER_SELECT = {
       githubUsername: true,
       portfolioUrl: true,
       linkedinUrl: true,
+      cgpa: true,
+      tenthPercentage: true,
+      twelfthPercentage: true,
+      leetcodeUsername: true,
+      codeforcesHandle: true,
+      codechefUsername: true,
+      hackerrankUsername: true,
+      gfgUsername: true,
     },
   },
 } as const
@@ -60,6 +69,25 @@ function optionalUrl(value: unknown, label: string): string | null {
     if (url.protocol === "http:" || url.protocol === "https:") return url.toString()
   } catch {}
   throw new Error(`${label} must be a valid http(s) URL`)
+}
+
+function optionalNumber(value: unknown, label: string, max: number): number | null {
+  if (value === undefined || value === null || value === "") return null
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : NaN
+  if (!Number.isFinite(n) || n < 0 || n > max) throw new Error(`${label} must be a number between 0 and ${max}`)
+  return Math.round(n * 100) / 100
+}
+
+function codingHandles(body: Record<string, unknown>) {
+  const handles: Record<string, string | null> = {}
+  for (const platform of CODING_PLATFORMS) {
+    const field = HANDLE_FIELD[platform]
+    const raw = optionalText(body[field], 200)
+    const handle = raw ? parseCodingHandle(platform, raw) : null
+    if (raw && !handle) throw new Error(`${PLATFORM_INFO[platform].label}: enter a username or profile URL`)
+    handles[field] = handle
+  }
+  return handles
 }
 
 function stringList(value: unknown, maxItems: number): string[] {
@@ -103,6 +131,10 @@ export async function PATCH(req: Request) {
       linkedinUrl: optionalUrl(body.linkedinUrl, "LinkedIn URL"),
       skills: stringList(body.skills, 50),
       preferredIndustries: stringList(body.preferredIndustries, 20),
+      cgpa: optionalNumber(body.cgpa, "CGPA", 10),
+      tenthPercentage: optionalNumber(body.tenthPercentage, "10th percentage", 100),
+      twelfthPercentage: optionalNumber(body.twelfthPercentage, "12th percentage", 100),
+      ...codingHandles(body),
     }
 
     await prisma.user.update({

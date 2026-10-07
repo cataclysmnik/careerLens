@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import {
   Loader2, Mail, CalendarDays, KeyRound, MapPin, Target, Briefcase,
-  GitFork, Globe, Link2, CheckCircle2, ArrowRight,
+  GitFork, Globe, Link2, CheckCircle2, ArrowRight, GraduationCap, Code,
 } from 'lucide-react';
 import type { Me } from '@/lib/types/me';
 import type { ScoringResult } from '@/lib/scoring/engine';
 import { ROLE_BADGE_CLASS, ROLE_LABEL } from '@/lib/roles';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import { profileChecklist, profileCompleteness } from '@/lib/profileCompleteness';
+import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO } from '@/lib/coding/handles';
 
 const EXPERIENCE_LEVELS = [
   'Student / Fresher',
@@ -31,7 +32,17 @@ type FormState = {
   linkedinUrl: string;
   skills: string;
   preferredIndustries: string;
+  cgpa: string;
+  tenthPercentage: string;
+  twelfthPercentage: string;
+  leetcodeUsername: string;
+  codeforcesHandle: string;
+  codechefUsername: string;
+  hackerrankUsername: string;
+  gfgUsername: string;
 };
+
+const numToText = (n: number | null | undefined) => (n == null ? '' : String(n));
 
 function toForm(me: Me): FormState {
   const p = me.profile;
@@ -45,6 +56,14 @@ function toForm(me: Me): FormState {
     linkedinUrl: p?.linkedinUrl ?? '',
     skills: (p?.skills ?? []).join(', '),
     preferredIndustries: (p?.preferredIndustries ?? []).join(', '),
+    cgpa: numToText(p?.cgpa),
+    tenthPercentage: numToText(p?.tenthPercentage),
+    twelfthPercentage: numToText(p?.twelfthPercentage),
+    leetcodeUsername: p?.leetcodeUsername ?? '',
+    codeforcesHandle: p?.codeforcesHandle ?? '',
+    codechefUsername: p?.codechefUsername ?? '',
+    hackerrankUsername: p?.hackerrankUsername ?? '',
+    gfgUsername: p?.gfgUsername ?? '',
   };
 }
 
@@ -133,6 +152,10 @@ export default function ProfilePage() {
     p?.githubUsername && { icon: GitFork, label: `github.com/${p.githubUsername}`, href: `https://github.com/${p.githubUsername}` },
     p?.portfolioUrl && { icon: Globe, label: 'Portfolio', href: p.portfolioUrl },
     p?.linkedinUrl && { icon: Link2, label: 'LinkedIn', href: p.linkedinUrl },
+    ...CODING_PLATFORMS.map((platform) => {
+      const handle = p?.[HANDLE_FIELD[platform]];
+      return handle && { icon: Code, label: PLATFORM_INFO[platform].label, href: PLATFORM_INFO[platform].profileUrl(handle) };
+    }),
   ].filter(Boolean) as { icon: typeof GitFork; label: string; href: string }[];
 
   return (
@@ -225,6 +248,24 @@ export default function ProfilePage() {
               </ul>
             </div>
 
+            {(p?.cgpa != null || p?.tenthPercentage != null || p?.twelfthPercentage != null) && (
+              <div className={cardClass}>
+                <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Academics</h3>
+                <dl className="grid grid-cols-3 gap-3 text-center">
+                  {[
+                    { label: 'CGPA', value: p?.cgpa },
+                    { label: '12th', value: p?.twelfthPercentage, suffix: '%' },
+                    { label: '10th', value: p?.tenthPercentage, suffix: '%' },
+                  ].map((a) => (
+                    <div key={a.label} className="rounded-lg bg-gray-50 dark:bg-zinc-800/60 py-3">
+                      <dd className="text-lg font-bold">{a.value != null ? `${a.value}${a.suffix ?? ''}` : '—'}</dd>
+                      <dt className="text-xs text-gray-500 dark:text-gray-400">{a.label}</dt>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
             {(p?.skills.length ?? 0) > 0 && (
               <div className={cardClass}>
                 <h3 className="text-sm font-semibold uppercase tracking-wider mb-3">Skills</h3>
@@ -281,6 +322,27 @@ export default function ProfilePage() {
             </div>
 
             <div className="pt-2 border-t border-gray-200 dark:border-zinc-800">
+              <h3 className="text-sm font-semibold mt-4 mb-4">
+                <GraduationCap className="inline w-4 h-4 mr-1" />Academics
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div>
+                  <label htmlFor="cgpa" className={labelClass}>CGPA (out of 10)</label>
+                  <input id="cgpa" type="number" inputMode="decimal" min="0" max="10" step="0.01" value={form.cgpa} onChange={set('cgpa')} className={inputClass} placeholder="8.45" />
+                </div>
+                <div>
+                  <label htmlFor="twelfthPercentage" className={labelClass}>12th percentage</label>
+                  <input id="twelfthPercentage" type="number" inputMode="decimal" min="0" max="100" step="0.01" value={form.twelfthPercentage} onChange={set('twelfthPercentage')} className={inputClass} placeholder="92.4" />
+                </div>
+                <div>
+                  <label htmlFor="tenthPercentage" className={labelClass}>10th percentage</label>
+                  <input id="tenthPercentage" type="number" inputMode="decimal" min="0" max="100" step="0.01" value={form.tenthPercentage} onChange={set('tenthPercentage')} className={inputClass} placeholder="95" />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">Visible to your placement cell. If your board used CGPA for 10th/12th, convert it to a percentage.</p>
+            </div>
+
+            <div className="pt-2 border-t border-gray-200 dark:border-zinc-800">
               <h3 className="text-sm font-semibold mt-4 mb-4">Links</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
@@ -295,6 +357,28 @@ export default function ProfilePage() {
                   <label htmlFor="linkedinUrl" className={labelClass}>LinkedIn URL</label>
                   <input id="linkedinUrl" type="url" value={form.linkedinUrl} onChange={set('linkedinUrl')} className={inputClass} placeholder="https://linkedin.com/in/you" />
                 </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-gray-200 dark:border-zinc-800">
+              <div className="flex items-center justify-between mt-4 mb-4">
+                <h3 className="text-sm font-semibold">
+                  <Code className="inline w-4 h-4 mr-1" />Coding profiles
+                </h3>
+                <Link href="/profile/coding" className="text-xs font-medium text-blue-600 hover:underline">
+                  Analyze coding profiles →
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {CODING_PLATFORMS.map((platform) => {
+                  const field = HANDLE_FIELD[platform];
+                  return (
+                    <div key={platform}>
+                      <label htmlFor={field} className={labelClass}>{PLATFORM_INFO[platform].label}</label>
+                      <input id={field} value={form[field]} onChange={set(field)} className={inputClass} placeholder="Username or profile URL" />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

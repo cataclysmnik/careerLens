@@ -1,5 +1,26 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Setup on a new machine
+
+Env files are gitignored because they hold secrets (database password, OAuth
+secret, session secret, email app password). A fresh clone has none, and auth
+fails with `ClientFetchError: There was a problem with the server configuration`.
+
+1. Copy `.env.example` to `.env.local` and fill in the values. Get them from a
+   teammate over a private channel, never through git. `npm run dev` lists any
+   that are still missing.
+2. Install dependencies and generate the Prisma client:
+   ```bash
+   npm install
+   npx prisma generate
+   ```
+3. If the app runs anywhere other than `http://localhost:3000`, set `NEXTAUTH_URL`
+   to that address and add `<address>/api/auth/callback/google` to the OAuth
+   client's authorized redirect URIs in Google Cloud Console.
+4. The database is hosted on Supabase, so there's nothing to run locally. Some
+   college/office Wi-Fi blocks Postgres ports (5432/6543); if you see
+   "Can't reach database server", switch networks.
+
 ## Getting Started
 
 First, run the development server:

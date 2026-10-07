@@ -64,6 +64,14 @@ model Profile {
   githubUsername      String?
   portfolioUrl        String?
   linkedinUrl         String?
+  cgpa                Float?   // out of 10
+  tenthPercentage     Float?
+  twelfthPercentage   Float?
+  leetcodeUsername    String?
+  codeforcesHandle    String?
+  codechefUsername    String?
+  hackerrankUsername  String?
+  gfgUsername         String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
