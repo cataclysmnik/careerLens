@@ -5,7 +5,14 @@ import { auth } from "@/lib/auth";
 // Next.js version, so it can safely share lib/auth.ts, which depends on
 // Prisma for its signIn/jwt callbacks.
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/pending-approval"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/register",
+  "/pending-approval",
+  "/forgot-password",
+  "/reset-password",
+]);
 
 const ROLE_HOME: Record<string, string> = {
   STUDENT: "/dashboard",
@@ -16,7 +23,11 @@ const ROLE_HOME: Record<string, string> = {
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/api/auth") || pathname === "/api/register") {
+  if (
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/password/") ||
+    pathname === "/api/register"
+  ) {
     return NextResponse.next();
   }
 
