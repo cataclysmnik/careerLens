@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Github, Loader2, GitMerge, Search, ShieldCheck } from 'lucide-react';
+import { GitFork, Loader2, GitMerge, Search, ShieldCheck } from 'lucide-react';
 import type { GithubSkillEvidence } from '@/lib/github/analyzer';
 
 type GithubResults = {
@@ -48,7 +48,7 @@ export default function GithubIntegrationPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans text-gray-900 dark:text-gray-100">
       <header className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <Github className="w-5 h-5" />
+          <GitFork className="w-5 h-5" />
           <h1 className="text-xl font-bold tracking-tight">GitHub Evidence Analyzer</h1>
         </div>
         <div className="flex items-center gap-4">
@@ -62,7 +62,7 @@ export default function GithubIntegrationPage() {
         {!results ? (
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-10 text-center flex flex-col items-center">
             <div className="w-16 h-16 bg-gray-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-6">
-              <Github className="w-8 h-8 text-gray-700 dark:text-gray-300" />
+              <GitFork className="w-8 h-8 text-gray-700 dark:text-gray-300" />
             </div>
             <h2 className="text-2xl font-bold mb-2">Connect GitHub Profile</h2>
             <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md">
@@ -189,7 +189,7 @@ export default function GithubIntegrationPage() {
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-zinc-900/50 rounded-lg border border-gray-200 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all shadow-sm"
                           >
-                            <Github className="w-3.5 h-3.5" />
+                            <GitFork className="w-3.5 h-3.5" />
                             {repo.name}
                           </a>
                         </li>
@@ -208,7 +208,7 @@ export default function GithubIntegrationPage() {
                     <div key={idx} className="p-4 border border-gray-200 dark:border-zinc-800 rounded-lg hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
                       <div className="flex items-center justify-between mb-2">
                         <a href={`https://github.com/${results.username}/${repo.name}`} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center gap-2">
-                          <Github className="w-4 h-4" />
+                          <GitFork className="w-4 h-4" />
                           {repo.name}
                         </a>
                         {repo.language && (

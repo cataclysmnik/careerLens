@@ -2,7 +2,9 @@
 
 import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { UploadCloud, FileText, Loader2, Github, Globe, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, GitFork, Globe, CheckCircle2 } from 'lucide-react';
+import { aggregateEvidence } from '@/lib/evidence/aggregator';
+import { calculateReadiness } from '@/lib/scoring/engine';
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -39,8 +41,8 @@ export default function OnboardingPage() {
       const parsedResume = resumeData.data;
 
       // Extract Usernames & URLs
-      let githubUsername = null;
-      let portfolioUrl = null;
+      let githubUsername: string | null = null;
+      let portfolioUrl: string | null = null;
 
       parsedResume.links.forEach((link: string) => {
         if (link.includes('github.com')) {
@@ -129,6 +131,20 @@ export default function OnboardingPage() {
         portfolio: portfolioData
       }));
 
+      // Persist to the server so the dashboard, placement cell, and future
+      // devices/browsers can all see this student's evidence and score.
+      try {
+        const unifiedEvidence = aggregateEvidence(parsedResume, githubData, portfolioData);
+        const scoring = calculateReadiness(unifiedEvidence);
+        await fetch('/api/students/evidence', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ evidence: unifiedEvidence, scoring }),
+        });
+      } catch (e) {
+        console.error('Failed to persist evidence to server', e);
+      }
+
       setScrapedData({
         github: githubData,
         portfolio: portfolioData
@@ -214,7 +230,7 @@ export default function OnboardingPage() {
             {!scrapedData ? (
               <div className="space-y-4 max-w-sm mx-auto">
                 <StepIndicator icon={FileText} title="Parsing Resume" active={step >= 2} completed={step > 2} />
-                <StepIndicator icon={Github} title="GitHub Analysis" active={step >= 3} completed={step > 3} />
+                <StepIndicator icon={GitFork} title="GitHub Analysis" active={step >= 3} completed={step > 3} />
                 <StepIndicator icon={Globe} title="Portfolio Scanning" active={step >= 4} completed={step > 4} />
                 <StepIndicator icon={CheckCircle2} title="Finalizing Profile" active={step >= 5} completed={step > 5} />
               </div>
@@ -223,7 +239,7 @@ export default function OnboardingPage() {
                 {scrapedData.github && (
                   <div className="p-4 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl">
                     <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
-                      <Github className="w-5 h-5" /> Scraped GitHub Data
+                      <GitFork className="w-5 h-5" /> Scraped GitHub Data
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                       Found <span className="font-bold">{scrapedData.github.totalRepos}</span> total repositories for <span className="font-bold">@{scrapedData.github.username}</span>.

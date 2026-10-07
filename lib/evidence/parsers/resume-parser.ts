@@ -80,10 +80,10 @@ export function parseResumeDeterministic(text: string): ParsedResume {
 
   // Mock AI Semantic Extraction for the Phase 3 requirement
   // "Use deterministic extraction where practical and AI for ambiguous semantic extraction"
-  const aiDetectedClaims = finalSkills.map(skill => ({
+  const aiDetectedClaims: { skill: string; context: string; confidence: 'High' | 'Medium' | 'Low' }[] = finalSkills.map(skill => ({
     skill,
     context: `Detected context suggesting experience with ${skill} in a professional setting.`,
-    confidence: 'High' as const,
+    confidence: 'High',
   }));
 
   // Add some mock ambiguous claims that an AI might find

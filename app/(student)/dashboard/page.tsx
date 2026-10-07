@@ -6,7 +6,7 @@ import { ReadinessScore } from "@/components/dashboard/ReadinessScore";
 import { CategoryScoreCard } from "@/components/dashboard/CategoryScoreCard";
 import { StrengthsAndGaps } from "@/components/dashboard/StrengthsAndGaps";
 import { RecommendedActions } from "@/components/dashboard/RecommendedActions";
-import { ShieldCheck, Loader2, Github } from "lucide-react";
+import { ShieldCheck, Loader2, GitFork } from "lucide-react";
 import { aggregateEvidence, UnifiedEvidence } from "@/lib/evidence/aggregator";
 import { calculateReadiness, ScoringResult } from "@/lib/scoring/engine";
 
@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
+    const loadFromLocalStorageOrMock = () => {
       const stored = localStorage.getItem('careerlens_pipeline');
       if (stored) {
         const { resume, github, portfolio } = JSON.parse(stored);
@@ -37,11 +37,25 @@ export default function DashboardPage() {
         setEvidence(unifiedEvidence);
         setScoring(calculateReadiness(unifiedEvidence));
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    (async () => {
+      try {
+        const res = await fetch('/api/students/evidence');
+        if (res.ok) {
+          const { data } = await res.json();
+          setEvidence(data.evidence);
+          setScoring(data.scoring);
+        } else {
+          loadFromLocalStorageOrMock();
+        }
+      } catch (e) {
+        console.error(e);
+        loadFromLocalStorageOrMock();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
 
   if (isLoading) {
@@ -165,7 +179,7 @@ export default function DashboardPage() {
                               rel="noreferrer"
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-zinc-900/50 rounded-lg border border-gray-200 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm font-medium text-gray-700 dark:text-gray-300 transition-all shadow-sm"
                             >
-                              <Github className="w-3.5 h-3.5" />
+                              <GitFork className="w-3.5 h-3.5" />
                               {repo.name}
                             </a>
                           </li>

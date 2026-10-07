@@ -24,7 +24,7 @@ export default function LoginPage() {
       });
 
       if (res?.error) {
-        setError('Invalid email or password');
+        setError('Invalid email or password, or your account is still awaiting approval.');
       } else {
         router.push('/dashboard');
         router.refresh();
@@ -83,8 +83,25 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200 dark:border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-white dark:bg-zinc-900 px-2 text-gray-400">or</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 dark:border-zinc-700 px-3 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-800"
+          >
+            Continue with Google
+          </button>
+
           <div className="text-center text-sm">
-            <span className="text-gray-500">Don't have an account? </span>
+            <span className="text-gray-500">Don&apos;t have an account? </span>
             <Link href="/register" className="font-semibold text-blue-600 hover:text-blue-500">
               Register here
             </Link>

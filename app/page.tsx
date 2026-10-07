@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, FileText, Github, Globe, ShieldCheck, Zap, Code2, LineChart } from "lucide-react";
+import { ArrowRight, FileText, GitFork, Globe, ShieldCheck, Zap, Code2, LineChart } from "lucide-react";
 
 export default function Home() {
   return (
@@ -128,7 +128,7 @@ export default function Home() {
 
             <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-8 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Github className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                <GitFork className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
               </div>
               <h3 className="text-xl font-bold mb-3">Deep GitHub Analysis</h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
