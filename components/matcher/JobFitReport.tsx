@@ -2,8 +2,8 @@
 
 import React from 'react';
 import {
-  CheckCircle2, XCircle, HelpCircle, AlertTriangle, Sparkles, Lightbulb, MessageSquareQuote,
-  ListChecks, TrendingUp, PlusCircle, GraduationCap, Briefcase, FolderGit2, Info, Globe, ExternalLink,
+  CheckCircle2, XCircle, HelpCircle, AlertTriangle, Sparkles,
+  ListChecks, PlusCircle, GraduationCap, Briefcase, FolderGit2, Info, Globe, ExternalLink,
 } from 'lucide-react';
 import type { JobFitResult } from '@/lib/scoring/jobMatch';
 import { VERDICT_LABEL, type FitVerdict } from '@/lib/scoring/verdict';
@@ -358,53 +358,7 @@ export function JobFitReport({ result }: { result: JobFitResult }) {
         </div>
       )}
 
-      {/* Actions */}
-      {(result.nextActions.length > 0 || (a && a.recommendations.length > 0)) && (
-        <div className={card}>
-          <h3 className="font-bold mb-1 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /> What would raise this fit most</h3>
-          <p className="text-sm text-gray-500 mb-4">Ranked by ROI = expected improvement × importance ÷ effort. Gains are estimates, not guarantees.</p>
-          {result.nextActions.length > 0 && (
-            <ol className="space-y-3 mb-5">
-              {result.nextActions.map((x, i) => (
-                <li key={i} className="flex gap-3 text-sm">
-                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold">{x.title}</span>
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">{x.impact}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{x.description}</p>
-                    <p className="text-[11px] text-gray-400 mt-1 tabular-nums">
-                      ≈ +{Math.round(x.expectedImprovement)} {x.skill} · ≈ +{x.estimatedRoleFitGain} role fit · ROI {x.roi}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-          {a && a.recommendations.length > 0 && (
-            <div className="border-t border-gray-100 dark:border-zinc-800 pt-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5"><Lightbulb className="w-3.5 h-3.5" /> AI recommendations for this role</p>
-              <ul className="space-y-2">
-                {a.recommendations.map((r, i) => (
-                  <li key={i} className="text-sm"><span className="font-medium">{r.action}</span><span className="text-gray-500"> — {r.why}</span></li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
 
-      {a && a.interviewFocus.length > 0 && (
-        <div className={card}>
-          <h3 className="font-bold mb-3 flex items-center gap-2"><MessageSquareQuote className="w-5 h-5 text-blue-600" /> Likely interview focus</h3>
-          <ul className="flex flex-wrap gap-2">
-            {a.interviewFocus.map((t, i) => (
-              <li key={i} className="px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 text-sm">{t}</li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {/* Provenance */}
       <div className="flex items-start gap-2 text-[11px] text-gray-400">
