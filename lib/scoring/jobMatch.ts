@@ -8,6 +8,7 @@
 
 import { extractJobRequirements } from '@/lib/llm/extract-jd';
 import { generateFitAssessment } from '@/lib/llm/cross-validate';
+import { isLLMEnabled } from '@/lib/llm/groq';
 import type { FitAssessment, JobRequirements } from '@/lib/llm/schemas';
 import { canonicalizeSkill } from './skill-taxonomy';
 import { computeRoleFit, recommendActions, type NextAction, type RequirementResult, type RoleFitResult } from './role-fit';
@@ -107,11 +108,37 @@ export async function analyzeJobFit(
   opts: { explain?: boolean } = {}
 ): Promise<JobFitResult> {
   const explain = opts.explain ?? true;
-  const errors: string[] = [];
 
   // 1. Interpret the JD.
   const jd = await extractJobRequirements(jobDescription);
-  if (jd.ai.error) errors.push(`JD parsing: ${jd.ai.error}`);
+  const result = computeJobFit(inputs, jd.requirements, { enabled: jd.ai.enabled, used: jd.ai.used });
+  if (jd.ai.error) result.ai.errors.push(`JD parsing: ${jd.ai.error}`);
+
+  // 3. Explain. Runs after every number is fixed; its output can't change them.
+  // The explanation model runs on Groq; without a Groq key the scores stand on their own.
+  if (explain && isLLMEnabled()) {
+    try {
+      result.assessment = await generateFitAssessment(inputs.profile, jobDescription, result);
+      result.ai.assessment = 'llm';
+    } catch (e) {
+      result.ai.errors.push(`Assessment: ${e instanceof Error ? e.message : 'failed'}`);
+    }
+  }
+  return result;
+}
+
+/**
+ * Step 2 alone: score a candidate against requirements already extracted from
+ * a JD (e.g. stored on a job listing). Pure and synchronous — no LLM — so every
+ * applicant to a listing is ranked by exactly the same formula and inputs.
+ */
+export function computeJobFit(
+  inputs: EvidenceInputs,
+  requirements: JobRequirements,
+  ai: { enabled: boolean; used: boolean }
+): JobFitResult {
+  const errors: string[] = [];
+  const jd = { requirements, ai };
   const reqs = toRoleRequirements(jd.requirements);
 
   // 2. Measure + calculate.
@@ -172,16 +199,5 @@ export async function analyzeJobFit(
       errors,
     },
   };
-
-  // 3. Explain. Runs after every number is fixed; its output can't change them.
-  if (explain && jd.ai.enabled) {
-    try {
-      result.assessment = await generateFitAssessment(inputs.profile, jobDescription, result);
-      result.ai.assessment = 'llm';
-    } catch (e) {
-      errors.push(`Assessment: ${e instanceof Error ? e.message : 'failed'}`);
-    }
-  }
-
   return result;
 }

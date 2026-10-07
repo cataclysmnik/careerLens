@@ -21,6 +21,13 @@ enum AccountStatus {
   PENDING
 }
 
+enum JobListingStatus {
+  PENDING // awaiting placement-cell approval
+  APPROVED // visible to students
+  REJECTED
+  CLOSED // no longer accepting applications
+}
+
 model User {
   id            String        @id @default(cuid())
   name          String?
@@ -37,6 +44,9 @@ model User {
   evidence            StudentEvidence?
   notifications       Notification[]
   passwordResetTokens PasswordResetToken[]
+  jobListings         JobListing[]          @relation("CompanyListings")
+  reviewedListings    JobListing[]          @relation("ListingReviewer")
+  applications        JobApplication[]
 }
 
 model PasswordResetToken {
@@ -97,4 +107,44 @@ model Notification {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model JobListing {
+  id             String           @id @default(cuid())
+  companyId      String
+  title          String
+  location       String?
+  employmentType String           // internship | full_time
+  ctc            String?          // free text, e.g. "12 LPA" or "40k/month stipend"
+  deadline       DateTime?
+  description    String
+  /// Requirements the LLM extracted from the description at creation (JobRequirements).
+  /// Stored once so every applicant is scored against the same requirements.
+  requirements   Json?
+  status         JobListingStatus @default(PENDING)
+  reviewNote     String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  company      User             @relation("CompanyListings", fields: [companyId], references: [id], onDelete: Cascade)
+  reviewedBy   User?            @relation("ListingReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  applications JobApplication[]
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model JobApplication {
+  id        String   @id @default(cuid())
+  listingId String
+  studentId String
+  createdAt DateTime @default(now())
+
+  listing JobListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  student User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, studentId])
+  @@index([studentId])
 }

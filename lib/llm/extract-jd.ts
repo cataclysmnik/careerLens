@@ -4,6 +4,7 @@
 
 import { createHash } from 'crypto';
 import { callGroqJSON, GROQ_MODELS, isLLMEnabled } from './groq';
+import { callGeminiJSON, isGeminiEnabled } from './gemini';
 import { JobRequirementsSchema, type JobRequirements } from './schemas';
 import { findSkillsInText, skillLabel } from '@/lib/scoring/skill-taxonomy';
 
@@ -36,7 +37,7 @@ responsibilities: up to 8 short bullet summaries of what the role does.`;
 
 // Same JD text -> same requirements -> same score (§39). Keeps repeat analyses
 // reproducible within a server process and saves LLM calls.
-const cache = new Map<string, JobRequirements>();
+const cache = new Map<string, { requirements: JobRequirements; model: string }>();
 const CACHE_LIMIT = 200;
 
 export type JDExtractionResult = {
@@ -48,31 +49,50 @@ export async function extractJobRequirements(jobDescription: string): Promise<JD
   const jd = jobDescription.trim().slice(0, MAX_JD_CHARS);
   const key = createHash('sha256').update(jd).digest('hex');
 
-  if (!isLLMEnabled()) {
+  if (!isGeminiEnabled() && !isLLMEnabled()) {
     return { requirements: keywordRequirements(jd), ai: { enabled: false, used: false, model: null, error: null } };
   }
 
   const cached = cache.get(key);
-  if (cached) return { requirements: cached, ai: { enabled: true, used: true, model: GROQ_MODELS.extraction, error: null } };
+  if (cached) return { requirements: cached.requirements, ai: { enabled: true, used: true, model: cached.model, error: null } };
 
-  try {
-    const raw = await callGroqJSON({
-      model: GROQ_MODELS.extraction,
-      system: SYSTEM,
-      user: `Job description:\n"""\n${jd}\n"""`,
-      schema: JobRequirementsSchema,
-      schemaName: 'job_requirements',
-      maxTokens: 8192,
-    });
-    const requirements = sanitizeRequirements(raw);
+  // Same provider order as resume extraction: Gemini, then Groq, then keywords.
+  const errors: string[] = [];
+  const remember = (requirements: JobRequirements, model: string): JDExtractionResult => {
     if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value!);
-    cache.set(key, requirements);
-    return { requirements, ai: { enabled: true, used: true, model: GROQ_MODELS.extraction, error: null } };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'JD extraction failed';
-    console.error('[llm] JD extraction failed, using keyword fallback:', message);
-    return { requirements: keywordRequirements(jd), ai: { enabled: true, used: false, model: GROQ_MODELS.extraction, error: message } };
+    cache.set(key, { requirements, model });
+    return { requirements, ai: { enabled: true, used: true, model, error: null } };
+  };
+  const user = `Job description:\n"""\n${jd}\n"""`;
+
+  if (isGeminiEnabled()) {
+    try {
+      const { data, model } = await callGeminiJSON({ system: SYSTEM, parts: [{ text: user }], schema: JobRequirementsSchema, maxTokens: 8192 });
+      return remember(sanitizeRequirements(data), model);
+    } catch (e) {
+      errors.push(`Gemini: ${e instanceof Error ? e.message : 'failed'}`);
+    }
   }
+
+  if (isLLMEnabled()) {
+    try {
+      const raw = await callGroqJSON({
+        model: GROQ_MODELS.extraction,
+        system: SYSTEM,
+        user,
+        schema: JobRequirementsSchema,
+        schemaName: 'job_requirements',
+        maxTokens: 8192,
+      });
+      return remember(sanitizeRequirements(raw), GROQ_MODELS.extraction);
+    } catch (e) {
+      errors.push(`Groq: ${e instanceof Error ? e.message : 'failed'}`);
+    }
+  }
+
+  const message = errors.join('; ') || 'JD extraction failed';
+  console.error('[llm] JD extraction failed, using keyword fallback:', message);
+  return { requirements: keywordRequirements(jd), ai: { enabled: true, used: false, model: null, error: message } };
 }
 
 function sanitizeRequirements(r: JobRequirements): JobRequirements {
