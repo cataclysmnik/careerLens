@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -47,6 +48,7 @@ model User {
   jobListings         JobListing[]          @relation("CompanyListings")
   reviewedListings    JobListing[]          @relation("ListingReviewer")
   applications        JobApplication[]
+  interviewSessions   InterviewSession[]
 }
 
 model PasswordResetToken {
@@ -152,3 +154,29 @@ model JobApplication {
   @@unique([listingId, studentId])
   @@index([studentId])
 }
+
+model InterviewSession {
+  id               String   @id @default(cuid())
+  userId           String
+  roleTitle        String   @default("Software Engineer") // e.g. "Full Stack Developer", "Backend Engineer"
+  seniority        String   @default("entry_mid") // entry, mid, senior
+  projectTitle     String?  // primary project or summary
+  relevantProjects Json?    // Array of relevant projects used in this interview
+  roleFocus        String?  // mixed_real_world, technical_deep_dive
+  jobDescription   String?  // Optional target job description provided for the interview
+  interviewerType  String   @default("tech_lead") // tech_lead, bar_raiser, friendly
+  status           String   @default("in_progress") // in_progress, completed
+  overallScore     Int?     // 0-100
+  metrics          Json?    // { technicalDepth: 85, clarity: 90, architecture: 80, roleFoundations: 75 }
+  messages         Json     // Array of { id, role, content, timestamp, feedback }
+  feedback         Json?    // { summary, strengths, areasToImprove, keyTakeaways }
+  resumeRewrites   Json?    // Array of { originalPoint, suggestedRewrite, impactMetric, reasoning, tags }
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+

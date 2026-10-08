@@ -5,6 +5,8 @@ import { readInputs } from '@/lib/evidence/student-evidence';
 import { analyzeJobFit, analyzeRoleFit } from '@/lib/scoring/jobMatch';
 import { researchRole } from '@/lib/jobs/role-research';
 
+import { getBasicJobDescription } from '@/lib/jobs/basic-jd';
+
 export const maxDuration = 90;
 
 const MIN_JD_LENGTH = 40;
@@ -18,8 +20,10 @@ export async function POST(req: Request) {
   try {
     const { role, jobDescription }: { role?: string; jobDescription?: string } = await req.json();
     const roleName = typeof role === 'string' ? role.trim() : '';
-    if (!roleName && (!jobDescription || jobDescription.trim().length < MIN_JD_LENGTH)) {
-      return NextResponse.json({ error: 'Enter the job role you are targeting.' }, { status: 400 });
+    const jdText = typeof jobDescription === 'string' ? jobDescription.trim() : '';
+
+    if (!roleName && (!jdText || jdText.length < MIN_JD_LENGTH)) {
+      return NextResponse.json({ error: 'Enter the job role you are targeting or provide a job description.' }, { status: 400 });
     }
     if (roleName && (roleName.length < 2 || roleName.length > 80)) {
       return NextResponse.json({ error: 'Enter a job role between 2 and 80 characters.' }, { status: 400 });
@@ -37,9 +41,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = roleName
-      ? await analyzeRoleFit(inputs, await researchRole(roleName))
-      : await analyzeJobFit(inputs, jobDescription!);
+    // If JD is provided, use it. If only role is provided, supply the basic JD of that role.
+    const effectiveJd = jdText.length >= MIN_JD_LENGTH
+      ? jdText
+      : (roleName ? getBasicJobDescription(roleName) : '');
+
+    const result = effectiveJd
+      ? await analyzeJobFit(inputs, effectiveJd)
+      : await analyzeRoleFit(inputs, await researchRole(roleName));
+
+    if (roleName && (!result.job.title || result.job.title.toLowerCase() === 'software engineer')) {
+      result.job.title = roleName;
+    }
+
     return NextResponse.json({ data: result });
   } catch (error: unknown) {
     console.error('Job Matching failed:', error);

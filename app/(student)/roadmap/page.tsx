@@ -57,7 +57,7 @@ export default function RoadmapPage() {
     return <div className="p-10 text-center text-sm text-red-500">Failed to load roadmap data.</div>;
   }
 
-  const actions = scoring?.actions || [];
+  const actions = scoring?.nextActions || [];
   
   if (actions.length === 0) {
     return (
