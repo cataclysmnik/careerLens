@@ -122,7 +122,7 @@ export function SkillRadarChart({ data, size = 300, className = '' }: SkillRadar
           const { x, y } = getPointCoordinates(135, index, totalPoints);
           
           // Determine text anchor based on x position relative to center
-          let textAnchor = 'middle';
+          let textAnchor: "end" | "start" | "middle" = 'middle';
           if (x > centerX + 10) textAnchor = 'start';
           else if (x < centerX - 10) textAnchor = 'end';
           

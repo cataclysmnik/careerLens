@@ -192,9 +192,10 @@ export async function PATCH(req: Request) {
           if (hs) hs.score = { type: 'percentage', value: updatedUser.profile.tenthPercentage, outOf: 100 }
         }
 
+        const storedEv = row.evidence as unknown as StoredEvidence;
         const { evidence, scoring } = buildStudentEvidence(
           inputs.profile,
-          inputs.github,
+          storedEv.githubSnapshot ?? null,
           inputs.portfolio,
           inputs.coding ?? null,
           updatedUser.profile.targetRole

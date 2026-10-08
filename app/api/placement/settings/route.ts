@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const sum = Object.values(weights).reduce((a: any, b: any) => a + b, 0);
+  const sum = Object.values(weights).reduce((a: number, b: any) => a + Number(b), 0) as number;
   if (Math.abs(sum - 1) > 1e-9) {
     return NextResponse.json({ error: "Weights must sum to 1.0" }, { status: 400 });
   }
