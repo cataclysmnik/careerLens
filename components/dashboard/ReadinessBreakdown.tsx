@@ -80,7 +80,7 @@ export function ReadinessBreakdown({ scoring }: { scoring: ScoringResult }) {
   })) || [];
 
   return (
-    <div className="flex flex-col xl:flex-row gap-6">
+    <div className="flex flex-col gap-6">
       <div className="flex-1 space-y-2">
         {scoring.trace.children?.map((node, i) => {
           const dim = scoring.dimensions[i];
@@ -117,8 +117,8 @@ export function ReadinessBreakdown({ scoring }: { scoring: ScoringResult }) {
       </div>
       
       {radarData.length >= 3 && (
-        <div className="xl:w-72 shrink-0 flex items-center justify-center p-4 bg-gray-50 dark:bg-zinc-900/50 rounded-xl border border-gray-100 dark:border-zinc-800">
-          <SkillRadarChart data={radarData} size={280} />
+        <div className="w-full flex items-center justify-center p-8 bg-gray-50 dark:bg-zinc-900/50 rounded-xl border border-gray-100 dark:border-zinc-800">
+          <SkillRadarChart data={radarData} size={350} />
         </div>
       )}
     </div>

@@ -68,7 +68,15 @@ export default function JobMatcherPage() {
   };
 
   if (profileState === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 animate-pulse p-4 md:p-8 mt-10">
+        <div className="h-8 w-48 bg-gray-200 dark:bg-zinc-800 rounded mb-8"></div>
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1 h-96 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+          <div className="w-full md:w-80 h-96 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+        </div>
+      </div>
+    );
   }
 
   if (profileState !== 'ready') {

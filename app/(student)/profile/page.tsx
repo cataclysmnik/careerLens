@@ -160,7 +160,22 @@ export default function ProfilePage() {
     return <div className="p-10 text-center text-sm text-red-500">{loadError}</div>;
   }
   if (!me || !form) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+    return (
+      <div className="max-w-3xl mx-auto space-y-8 animate-pulse p-4 md:p-8 mt-10">
+        <div className="flex flex-col md:flex-row items-center gap-6 mb-8 text-center md:text-left">
+          <div className="w-24 h-24 bg-gray-200 dark:bg-zinc-800 rounded-full"></div>
+          <div className="space-y-3 flex-1">
+            <div className="h-8 w-64 bg-gray-200 dark:bg-zinc-800 rounded mx-auto md:mx-0"></div>
+            <div className="h-4 w-40 bg-gray-200 dark:bg-zinc-800 rounded mx-auto md:mx-0"></div>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {[...Array(4)].map((_, i) => (
+             <div key={i} className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const p = me.profile;

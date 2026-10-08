@@ -64,7 +64,26 @@ export default function DashboardPage() {
   }, []);
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+    return (
+      <div className="max-w-7xl mx-auto space-y-6 animate-pulse p-4 md:p-8">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-14 h-14 bg-gray-200 dark:bg-zinc-800 rounded-full"></div>
+          <div className="space-y-2">
+            <div className="h-6 w-48 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+            <div className="h-4 w-32 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="h-40 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+          <div className="col-span-2 h-40 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+           {[...Array(4)].map((_, i) => (
+             <div key={i} className="h-28 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+           ))}
+        </div>
+      </div>
+    );
   }
 
   const firstName = me?.name?.trim().split(/\s+/)[0];

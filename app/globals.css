@@ -6,26 +6,152 @@
 @source "../lib";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f0f0f0; /* Softer light gray for light mode */
+  --foreground: #111111;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111111; /* Very dark gray */
+    --foreground: #d4d4d4; /* More light gray for text */
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-heading: var(--font-inter), system-ui, sans-serif; /* Clean sans-serif */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Modern Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  
+  /* Orange Accents */
+  --color-blue-500: #f97316; /* Bright orange accent */
+  --color-blue-600: #ea580c; /* Deeper orange accent */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Polished Typography */
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading) !important;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+/* Monochromatic & Orange Style Cards */
+.bg-white {
+  background-color: #fcfcfc; /* Very light gray */
+  border: 1px solid #e0e0e0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 8px !important; 
+}
+
+.bg-white:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+  border-color: #cccccc !important;
+  transition: all 0.2s ease;
+  transform: translateY(-1px);
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-white, .dark\:bg-zinc-900 {
+    background-color: #1a1a1a !important; /* Slightly lighter very dark gray */
+    border: 1px solid #333333 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    border-radius: 8px !important;
+  }
+  
+  .bg-white:hover, .dark\:bg-zinc-900:hover {
+    border-color: #555555 !important; /* Lighter gray on hover */
+    background-color: #222222 !important;
+    transform: translateY(-1px);
+  }
+}
+
+/* Crisp form inputs */
+input, select, textarea {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  border: 1px solid #e0e0e0 !important;
+  background-color: #ffffff !important;
+  transition: border 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  input, select, textarea {
+    border-color: #333333 !important;
+    background-color: #111111 !important;
+    color: #d4d4d4 !important;
+  }
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #f97316 !important; /* Orange focus */
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2) !important;
+  outline: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  input:focus, select:focus, textarea:focus {
+    border-color: #f97316 !important;
+  }
+}
+
+/* Vercel buttons */
+button {
+  border-radius: 6px !important;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* --- GLOBAL ANIMATIONS --- */
+
+@keyframes fadeInScale {
+  0% { opacity: 0; transform: scale(0.98) translateY(12px); filter: blur(2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+
+@keyframes slideDown {
+  0% { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Page load animation with a very smooth, drawn-out spring curve */
+main, .animate-page-transition {
+  animation: fadeInScale 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Details toggle animation */
+details[open] summary ~ * {
+  animation: slideDown 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Ultra-smooth anchor tags and buttons */
+a, button, summary, input, select {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* Interactive elements hover scaling */
+a:active, button:active, summary:active {
+  transform: scale(0.97) !important;
+}
+
+/* Image fading */
+img {
+  transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
