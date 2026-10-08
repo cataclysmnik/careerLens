@@ -198,8 +198,22 @@ export async function PATCH(req: Request) {
           storedEv.githubSnapshot ?? null,
           inputs.portfolio,
           inputs.coding ?? null,
-          updatedUser.profile.targetRole
+          updatedUser.profile.targetRole,
+          storedEv.history
         )
+        
+        // Append a profile edit event to history
+        evidence.history = [
+          ...(storedEv.history ?? []),
+          {
+            id: crypto.randomUUID(),
+            date: new Date().toISOString(),
+            type: 'PROFILE_EDIT',
+            title: 'Updated Profile',
+            description: 'Manually updated profile fields.',
+            score: scoring.overallScore,
+          }
+        ];
         
         await prisma.studentEvidence.update({
           where: { userId: session.user.id },

@@ -24,14 +24,34 @@ export async function POST(req: Request) {
       select: { targetRole: true },
     });
 
+    const existingRow = await prisma.studentEvidence.findUnique({
+      where: { userId: session.user.id },
+    });
+    const previousHistory = existingRow ? (existingRow.evidence as unknown as StoredEvidence).history ?? [] : [];
+
     // Scores are computed here, on the server, from the raw evidence.
     const { evidence, scoring } = buildStudentEvidence(
       profile.data,
       (body.github ?? null) as GithubAnalyzeData | null,
       (body.portfolio ?? null) as PortfolioEvidence | null,
       (body.coding ?? null) as CodingProfileSummary | null,
-      userProfile?.targetRole ?? null
+      userProfile?.targetRole ?? null,
+      previousHistory
     );
+
+    // Append a new history event for this resume upload
+    evidence.history = [
+      ...previousHistory,
+      {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        type: 'RESUME_UPLOAD',
+        title: 'Uploaded Resume',
+        description: 'Parsed resume and updated skills profile.',
+        score: scoring.overallScore,
+        skillsAdded: profile.data.skills.map(s => s.name).slice(0, 5)
+      }
+    ];
 
     const data = {
       evidence: evidence as unknown as Prisma.InputJsonValue,

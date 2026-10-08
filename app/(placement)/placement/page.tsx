@@ -130,16 +130,44 @@ export default function PlacementOverviewPage() {
           <div className={card}>
             <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider">Score Distribution</h3>
             {hasAnalyzed ? (
-              <div className="space-y-3">
-                {Object.entries(stats.scoreDistribution).map(([bucket, count]) => (
-                  <div key={bucket} className="flex items-center gap-3">
-                    <span className="w-16 text-xs text-gray-500">{bucket}</span>
-                    <div className="flex-1 h-3 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(count / maxBucket) * 100}%` }} />
+              <div className="h-48 flex items-end justify-between gap-[1px] mt-4 relative">
+                {/* Horizontal axis guides */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
+                  <div className="w-full border-t border-gray-900 dark:border-gray-100" />
+                  <div className="w-full border-t border-gray-900 dark:border-gray-100" />
+                  <div className="w-full border-t border-gray-900 dark:border-gray-100" />
+                  <div className="w-full border-t border-gray-900 dark:border-gray-100" />
+                </div>
+                {Object.entries(stats.scoreDistribution).map(([bucket, count]) => {
+                  const heightPct = maxBucket > 0 ? (count / maxBucket) * 100 : 0;
+                  const score = parseInt(bucket, 10);
+                  const showLabel = score % 20 === 0;
+                  
+                  return (
+                    <div key={bucket} className="flex flex-col items-center flex-1 group h-full z-10">
+                      <div className="w-full h-full flex justify-center items-end mb-1 relative">
+                        {count > 0 && (
+                          <div className="absolute bottom-full mb-1 flex flex-col items-center opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                            <span className="bg-gray-900 text-white dark:bg-white dark:text-gray-900 text-[10px] px-2 py-1 rounded shadow-lg">
+                              Score {bucket}: {count}
+                            </span>
+                          </div>
+                        )}
+                        <div 
+                          className={`w-full bg-blue-500 dark:bg-blue-600 rounded-t-[1px] transition-all duration-300 ease-in-out group-hover:bg-blue-400 dark:group-hover:bg-blue-500 ${count === 0 ? 'opacity-0' : 'opacity-100'}`} 
+                          style={{ height: `${heightPct}%`, minHeight: count > 0 ? '2px' : '0px' }} 
+                        />
+                      </div>
+                      <div className="h-4 mt-1 relative w-full flex justify-center">
+                        {showLabel && (
+                          <span className="text-[9px] text-gray-400 absolute top-0 transform -translate-x-1/2 left-1/2">
+                            {bucket}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="w-8 text-xs font-medium text-right">{count}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <EmptyNote />

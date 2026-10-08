@@ -58,6 +58,7 @@ export async function POST(req: Request) {
     let inputs: any = null;
     let targetRole: string | null = null;
     let existingId: string | undefined;
+    let previousHistory: any[] = [];
 
     if (existing) {
       existingId = existing.id;
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
       if (inputs && inputs.profile) {
         baseProfile = inputs.profile;
       }
+      previousHistory = storedEvidence.history ?? [];
     } else {
       const userProf = await prisma.profile.findUnique({ where: { userId: session.user.id } });
       targetRole = userProf?.targetRole ?? null;
@@ -122,8 +124,22 @@ export async function POST(req: Request) {
       inputs?.github ?? null,
       inputs?.portfolio ?? null,
       inputs?.coding ?? null,
-      targetRole
+      targetRole,
+      previousHistory
     );
+
+    newEvidence.history = [
+      ...previousHistory,
+      {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        type: 'PROFILE_EDIT',
+        title: 'LinkedIn Sync',
+        description: 'Synced data from LinkedIn profile.',
+        score: newScoring.overallScore,
+        skillsAdded: newSkills.map((s: any) => s.name).slice(0, 5),
+      }
+    ];
 
     if (existingId) {
       await prisma.studentEvidence.update({

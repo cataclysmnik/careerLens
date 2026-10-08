@@ -21,7 +21,21 @@ import { findRoleByTarget } from '@/lib/scoring/roles-catalog';
 /** The last GitHub analysis, kept so the GitHub Analyzer reopens with it. */
 export type GithubSnapshot = GithubAnalyzeData & { analyzedAt: string };
 
-export type StoredEvidence = UnifiedEvidence & { inputs: EvidenceInputs; githubSnapshot?: GithubSnapshot | null };
+export type HistoryEvent = {
+  id: string;
+  date: string;
+  type: 'RESUME_UPLOAD' | 'GITHUB_SYNC' | 'PORTFOLIO_SYNC' | 'PROFILE_EDIT';
+  title: string;
+  description: string;
+  score: number;
+  skillsAdded?: string[];
+};
+
+export type StoredEvidence = UnifiedEvidence & { 
+  inputs: EvidenceInputs; 
+  githubSnapshot?: GithubSnapshot | null;
+  history?: HistoryEvent[];
+};
 
 export const CandidateProfileSchema = CandidateExtractionSchema.extend({
   source: z.enum(['llm', 'fallback']),
@@ -80,7 +94,8 @@ export function buildStudentEvidence(
   github: GithubAnalyzeData | null,
   portfolio: PortfolioEvidence | null,
   coding: CodingProfileSummary | null,
-  targetRole: string | null
+  targetRole: string | null,
+  previousHistory: HistoryEvent[] = []
 ): { evidence: StoredEvidence; scoring: ScoringResult } {
   const inputs: EvidenceInputs = {
     profile,
@@ -91,7 +106,7 @@ export function buildStudentEvidence(
   };
   const unified = aggregateEvidence(parsedFromProfile(profile), github, portfolio, coding);
   return {
-    evidence: { ...unified, inputs, githubSnapshot: toGithubSnapshot(github) },
+    evidence: { ...unified, inputs, githubSnapshot: toGithubSnapshot(github), history: previousHistory },
     scoring: calculateReadiness(inputs, { targetRole }),
   };
 }
@@ -103,9 +118,21 @@ export function withCodingProfile(
   targetRole: string | null
 ): { evidence: StoredEvidence; scoring: ScoringResult } {
   const inputs: EvidenceInputs = { ...stored.inputs, coding, asOf: new Date().toISOString() };
+  const scoring = calculateReadiness(inputs, { targetRole });
+  const newHistory = [
+    ...(stored.history ?? []),
+    {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      type: 'PROFILE_EDIT',
+      title: 'Coding Profile Synced',
+      description: 'Updated coding platform statistics.',
+      score: scoring.overallScore,
+    } as HistoryEvent
+  ];
   return {
-    evidence: { ...stored, coding, inputs },
-    scoring: calculateReadiness(inputs, { targetRole }),
+    evidence: { ...stored, coding, inputs, history: newHistory },
+    scoring,
   };
 }
 
@@ -117,9 +144,21 @@ export function withGithubProfile(
 ): { evidence: StoredEvidence; scoring: ScoringResult } {
   const inputs: EvidenceInputs = { ...stored.inputs, github: toGithubInput(github), asOf: new Date().toISOString() };
   const unified = aggregateEvidence(parsedFromProfile(inputs.profile), github, inputs.portfolio, inputs.coding ?? null);
+  const scoring = calculateReadiness(inputs, { targetRole });
+  const newHistory = [
+    ...(stored.history ?? []),
+    {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      type: 'GITHUB_SYNC',
+      title: 'GitHub Profile Analyzed',
+      description: 'Synced repositories and extracted technical skills.',
+      score: scoring.overallScore,
+    } as HistoryEvent
+  ];
   return {
-    evidence: { ...stored, ...unified, inputs, githubSnapshot: toGithubSnapshot(github) },
-    scoring: calculateReadiness(inputs, { targetRole }),
+    evidence: { ...stored, ...unified, inputs, githubSnapshot: toGithubSnapshot(github), history: newHistory },
+    scoring,
   };
 }
 

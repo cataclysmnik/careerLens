@@ -347,6 +347,76 @@ export default function DashboardPage() {
           <RecommendedActions actions={scoring.actions} />
         </div>
 
+        {/* AI Resume & Portfolio Feedback */}
+        {((evidence?.inputs?.profile?.feedback && evidence.inputs.profile.feedback.length > 0) || evidence?.inputs?.portfolio) && (
+          <div className="mb-6 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-purple-500" />
+              AI Resume & Portfolio Feedback
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {evidence?.inputs?.profile?.feedback && evidence.inputs.profile.feedback.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3 text-sm uppercase tracking-wider">Resume Critique</h4>
+                  <ul className="space-y-3">
+                    {evidence.inputs.profile.feedback.map((f, i) => (
+                      <li key={i} className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                        <span className="shrink-0 text-purple-500 font-bold">•</span>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {evidence?.inputs?.portfolio && (
+                <div>
+                  <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-3 text-sm uppercase tracking-wider">Portfolio Insights</h4>
+                  <ul className="space-y-3">
+                    {!evidence.inputs.portfolio.hasCaseStudies && (
+                      <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                        <span className="shrink-0 text-purple-500 font-bold">•</span>
+                        <span>Consider adding case studies explaining your technical decisions and architecture.</span>
+                      </li>
+                    )}
+                    {evidence.inputs.portfolio.seoScore < 80 && (
+                      <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                        <span className="shrink-0 text-purple-500 font-bold">•</span>
+                        <span>Improve your portfolio&apos;s SEO by adding missing meta descriptions and title tags.</span>
+                      </li>
+                    )}
+                    {evidence.inputs.portfolio.accessibilityScore < 80 && (
+                      <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                        <span className="shrink-0 text-purple-500 font-bold">•</span>
+                        <span>Improve portfolio accessibility (e.g., semantic HTML, alt text on images).</span>
+                      </li>
+                    )}
+                    {evidence.inputs.portfolio.liveLinksCount === 0 && (
+                      <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                        <span className="shrink-0 text-purple-500 font-bold">•</span>
+                        <span>Include live demo links for your projects.</span>
+                      </li>
+                    )}
+                    {evidence.inputs.portfolio.githubLinksCount === 0 && (
+                      <li className="flex gap-3 text-sm text-gray-600 dark:text-gray-300">
+                        <span className="shrink-0 text-purple-500 font-bold">•</span>
+                        <span>Link your portfolio projects back to their GitHub repositories.</span>
+                      </li>
+                    )}
+                    {evidence.inputs.portfolio.hasCaseStudies && evidence.inputs.portfolio.seoScore >= 80 && evidence.inputs.portfolio.accessibilityScore >= 80 && evidence.inputs.portfolio.liveLinksCount > 0 && evidence.inputs.portfolio.githubLinksCount > 0 && (
+                      <li className="flex gap-3 text-sm text-green-600 dark:text-green-400">
+                        <span className="shrink-0 font-bold">•</span>
+                        <span>Your portfolio is looking great! Excellent technical presentation.</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Evidence Model UI */}
         <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">

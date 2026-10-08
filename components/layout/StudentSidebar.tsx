@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, GitFork, Globe, User, Briefcase, Trophy, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, FileText, GitFork, Globe, User, Briefcase, Trophy, ClipboardList, Map, History } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { SidebarUserCard } from './SidebarUserCard';
 
@@ -11,6 +11,8 @@ const RESUME_HREF = '/profile/resume';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Roadmap', href: '/roadmap', icon: Map },
+  { name: 'Timeline', href: '/timeline', icon: History },
   { name: 'Jobs', href: '/jobs', icon: ClipboardList },
   { name: 'Job Matcher', href: '/matcher', icon: Briefcase },
   { name: 'My Profile', href: '/profile', icon: User },

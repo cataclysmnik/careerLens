@@ -40,12 +40,10 @@ export async function GET() {
   const scores = analyzed.map((a) => a.scoring.overallScore);
   const averageScore = n > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / n) : 0;
 
-  const scoreDistribution = { "0-40": 0, "41-60": 0, "61-80": 0, "81-100": 0 };
+  const scoreDistribution: Record<string, number> = {};
+  for (let i = 0; i <= 100; i++) scoreDistribution[i.toString()] = 0;
   scores.forEach((s) => {
-    if (s <= 40) scoreDistribution["0-40"]++;
-    else if (s <= 60) scoreDistribution["41-60"]++;
-    else if (s <= 80) scoreDistribution["61-80"]++;
-    else scoreDistribution["81-100"]++;
+    scoreDistribution[s.toString()]++;
   });
 
   const tierCounts = Object.fromEntries(TIER_ORDER.map((t) => [t, 0])) as Record<ReadinessTier, number>;

@@ -69,6 +69,7 @@ async function postJSON<T>(url: string, body: unknown): Promise<{ data: T | null
 export async function runFullAnalysis(
   profile: CandidateProfile,
   parsedLinks: string[],
+  fastMode: boolean,
   onStep: (step: AnalysisStep, detail: string) => void
 ): Promise<AnalysisResult> {
   // What the student saved on My Profile fills in anything the resume doesn't link.
@@ -87,7 +88,7 @@ export async function runFullAnalysis(
   const problems: string[] = [];
 
   let github: GithubAnalyzeData | null = null;
-  if (githubUsername) {
+  if (!fastMode && githubUsername) {
     onStep('github', `Analyzing GitHub profile @${githubUsername}…`);
     const r = await postJSON<GithubAnalyzeData>('/api/github/analyze', { username: githubUsername });
     github = r.data;
@@ -95,7 +96,7 @@ export async function runFullAnalysis(
   }
 
   let portfolio: PortfolioEvidence | null = null;
-  if (portfolioUrl) {
+  if (!fastMode && portfolioUrl) {
     onStep('portfolio', `Scanning portfolio ${portfolioUrl}…`);
     const r = await postJSON<PortfolioEvidence>('/api/portfolio/analyze', { url: portfolioUrl });
     portfolio = r.data;
@@ -108,7 +109,7 @@ export async function runFullAnalysis(
 
   let coding: CodingProfileSummary | null = null;
   const platforms = Object.keys(handles) as (keyof CodingHandles)[];
-  if (platforms.length > 0) {
+  if (!fastMode && platforms.length > 0) {
     onStep('coding', `Analyzing coding profiles: ${platforms.map((p) => PLATFORM_INFO[p].label).join(', ')}…`);
     const r = await postJSON<CodingProfileSummary>('/api/coding/analyze', { handles });
     coding = r.data;

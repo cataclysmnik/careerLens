@@ -36,6 +36,7 @@ export default function ResumeUploadPage() {
   // null while loading; first-time students have no saved analysis yet.
   const [hasAnalysis, setHasAnalysis] = useState<boolean | null>(null);
   const [analysis, setAnalysis] = useState<{ step: AnalysisStep; detail: string; seen: AnalysisStep[] } | null>(null);
+  const [fastMode, setFastMode] = useState(false);
   const [analysisProblems, setAnalysisProblems] = useState<string[]>([]);
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export default function ResumeUploadPage() {
     setError(null);
     setAnalysis({ step: 'github', detail: 'Starting analysis…', seen: [] });
     try {
-      const result = await runFullAnalysis(profile, parsedData.links, (step, detail) =>
+      const result = await runFullAnalysis(profile, parsedData.links, fastMode, (step, detail) =>
         setAnalysis((a) => ({ step, detail, seen: [...(a?.seen ?? []), step] }))
       );
       setHasAnalysis(true);
@@ -325,14 +326,25 @@ export default function ResumeUploadPage() {
 
             {profile && <ExtractedProfile profile={profile} />}
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400 sm:mr-auto">
-                Next we’ll analyze the GitHub, portfolio and coding profiles linked on your resume.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Next we’ll analyze the GitHub, portfolio and coding profiles linked on your resume.
+                </p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={fastMode} 
+                    onChange={e => setFastMode(e.target.checked)} 
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Bypass external checks (Fast mode)</span>
+                </label>
+              </div>
               <button
                 onClick={handleConfirm}
                 disabled={!profile}
-                className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm shrink-0"
               >
                 {firstRun ? 'Confirm & Build My Profile' : 'Confirm & Re-analyze'}
               </button>
