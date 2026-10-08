@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db/prisma"
 import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO, parseCodingHandle } from "@/lib/coding/handles"
 import { Prisma } from "@prisma/client"
-import { readInputs, buildStudentEvidence } from "@/lib/evidence/student-evidence"
+import { readInputs, buildStudentEvidence, type StoredEvidence } from "@/lib/evidence/student-evidence"
 import { canonicalizeSkill } from "@/lib/scoring/skill-taxonomy"
 
 const USER_SELECT = {
