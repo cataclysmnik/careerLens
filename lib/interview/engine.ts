@@ -151,16 +151,18 @@ export function extractAllProjects(stored: StoredEvidence | null): InterviewProj
   return projects;
 }
 
-/** Match candidate projects to a target role, ranking them by relevance. */
+/** Match candidate projects to a target role and optional job description, ranking them by relevance. */
 export function matchProjectsToRole(
   targetRole: string,
-  allProjects: InterviewProject[]
+  allProjects: InterviewProject[],
+  jobDescription?: string | null
 ): {
   relevantProjects: InterviewProject[];
   matchedRoleSkills: string[];
   expectedTopics: string[];
 } {
   const normRole = targetRole.toLowerCase();
+  const jdText = (jobDescription || '').toLowerCase();
 
   // Find preset role if available
   const preset: RoleDefinition | undefined = ROLE_CATALOG.find((r) =>
@@ -188,7 +190,23 @@ export function matchProjectsToRole(
     }
   }
 
-  // Score each project against the role skills and keywords
+  // If a custom JD is provided, also look for technical terms mentioned in the JD
+  if (jdText) {
+    const commonTechTerms = [
+      'react', 'nextjs', 'vue', 'angular', 'node', 'express', 'python', 'django', 'fastapi',
+      'java', 'spring', 'go', 'golang', 'rust', 'c++', 'c#', '.net', 'sql', 'postgres', 'postgresql',
+      'mysql', 'mongodb', 'redis', 'kafka', 'graphql', 'rest', 'docker', 'kubernetes', 'aws',
+      'azure', 'gcp', 'ci/cd', 'terraform', 'typescript', 'javascript', 'html', 'css', 'tailwind',
+      'microservices', 'serverless', 'nosql', 'elasticsearch', 'pytorch', 'tensorflow', 'pandas'
+    ];
+    for (const term of commonTechTerms) {
+      if (jdText.includes(term)) {
+        roleSkillKeywords.add(term);
+      }
+    }
+  }
+
+  // Score each project against the role skills and JD keywords
   const scoredProjects = allProjects.map((p) => {
     const pText = `${p.title} ${p.description} ${p.skills.join(' ')} ${p.components.join(' ')}`.toLowerCase();
     const matchedSkills: string[] = [];
@@ -297,14 +315,16 @@ export async function generateJobInterviewOpening(params: {
   interviewerType: InterviewerType;
   relevantProjects: InterviewProject[];
   matchedRoleSkills: string[];
+  jobDescription?: string | null;
 }): Promise<{ message: string; suggestedFocusAreas: string[] }> {
-  const { targetRole, seniority, interviewerType, relevantProjects, matchedRoleSkills } = params;
+  const { targetRole, seniority, interviewerType, relevantProjects, matchedRoleSkills, jobDescription } = params;
   const topProjects = relevantProjects.slice(0, 2);
 
   if (isAnyLLMEnabled()) {
     try {
+      const jdContext = jobDescription ? `\nTarget Job Description Provided:\n${jobDescription}\n` : '';
       const system = `${getPersonaPrompt(interviewerType)}
-You are conducting a REAL-LIFE TECHNICAL INTERVIEW for the position of "${targetRole}" (${seniority.toUpperCase()} level).
+You are conducting a REAL-LIFE TECHNICAL INTERVIEW for the position of "${targetRole}" (${seniority.toUpperCase()} level).${jdContext}
 You have the candidate's resume in front of you. Their most relevant projects for this role are:
 ${topProjects.map((p) => `- "${p.title}": ${p.description} (Tech: ${p.skills.join(', ')})`).join('\n')}
 
@@ -313,13 +333,13 @@ Role Skills identified: ${matchedRoleSkills.join(', ')}
 Guidelines for the Opening:
 1. Welcome the candidate realistically as the interviewer for this ${targetRole} role.
 2. Note that you reviewed their resume and were interested in their project(s), specifically mentioning "${topProjects[0]?.title || 'their key project'}".
-3. Ask the first technical question: Ask them to walk through the architecture of that project, specifically how they solved a core engineering requirement for this ${targetRole} position.
+3. Ask the first technical question: Ask them to walk through the architecture of that project, specifically how they solved a core engineering requirement for this ${targetRole} position (or the provided Job Description).
 4. Keep the question crisp, professional, and conversational.
 5. Provide 2-3 brief focus areas they should highlight in their answer.`;
 
       const user = `Role: ${targetRole}
 Seniority: ${seniority}
-Candidate's relevant projects:
+${jobDescription ? `Job Description: ${jobDescription.slice(0, 1000)}\n` : ''}Candidate's relevant projects:
 ${topProjects.map((p) => `* ${p.title} (${p.skills.join(', ')})`).join('\n')}
 
 Generate the opening interview turn.`;
@@ -368,21 +388,24 @@ export async function generateJobInterviewNextTurn(params: {
   matchedRoleSkills: string[];
   expectedTopics: string[];
   messages: InterviewMessage[];
+  jobDescription?: string | null;
 }): Promise<{ message: string; critique: string | null; topicType: string }> {
-  const { targetRole, seniority, interviewerType, relevantProjects, matchedRoleSkills, expectedTopics, messages } = params;
+  const { targetRole, seniority, interviewerType, relevantProjects, matchedRoleSkills, expectedTopics, messages, jobDescription } = params;
   const userTurnsCount = messages.filter((m) => m.role === 'user').length;
   const topProjects = relevantProjects.slice(0, 3);
 
   if (isAnyLLMEnabled()) {
     try {
+      const jdContext = jobDescription ? `\nTarget Job Description Requirements:\n${jobDescription}\n` : '';
       const system = `${getPersonaPrompt(interviewerType)}
-You are conducting a REAL-LIFE TECHNICAL INTERVIEW for a "${targetRole}" role (${seniority.toUpperCase()} level).
+You are conducting a REAL-LIFE TECHNICAL INTERVIEW for a "${targetRole}" role (${seniority.toUpperCase()} level).${jdContext}
 
 Interview Blueprint:
 - In a real interview, you alternate naturally between:
   1) Deep diving into the candidate's actual projects (${topProjects.map((p) => p.title).join(', ')})
   2) General core technical questions that any ${targetRole} must know (e.g., ${expectedTopics.join('; ')})
   3) Scenario / problem-solving questions (e.g., handling scale, race conditions, edge cases, debugging)
+  ${jobDescription ? '4) Specific expectations, tools, or libraries called for in the target Job Description' : ''}
 - Current Turn: Candidate has completed ${userTurnsCount} answers so far.
   - If turn 1-2: Drill deeper into their project specifics, architectural trade-offs, schemas, or unexpected hurdles.
   - If turn 3-4: Transition smoothly to a fundamental/general technical question essential for a ${targetRole} (connecting it to their stack if possible).
@@ -398,7 +421,7 @@ Instructions:
         .join('\n\n');
 
       const user = `Target Role: ${targetRole} (${seniority})
-Relevant Projects:
+${jobDescription ? `Job Description: ${jobDescription.slice(0, 1000)}\n` : ''}Relevant Projects:
 ${topProjects.map((p) => `- ${p.title} (${p.skills.join(', ')})`).join('\n')}
 Core Skills: ${matchedRoleSkills.join(', ')}
 
@@ -472,14 +495,16 @@ export async function evaluateRoleInterviewSession(params: {
   seniority: SeniorityLevel;
   relevantProjects: InterviewProject[];
   messages: InterviewMessage[];
+  jobDescription?: string | null;
 }): Promise<InterviewEvaluation> {
-  const { targetRole, seniority, relevantProjects, messages } = params;
+  const { targetRole, seniority, relevantProjects, messages, jobDescription } = params;
   const candidateTurns = messages.filter((m) => m.role === 'user');
   const topProjects = relevantProjects.slice(0, 2);
 
   if (isAnyLLMEnabled() && candidateTurns.length >= 1) {
     try {
-      const system = `You are an Executive Engineering Director evaluating a candidate who just completed a technical interview for the position of "${targetRole}" (${seniority.toUpperCase()} level).
+      const jdContext = jobDescription ? `\nTarget Job Description Evaluated Against:\n${jobDescription}\n` : '';
+      const system = `You are an Executive Engineering Director evaluating a candidate who just completed a technical interview for the position of "${targetRole}" (${seniority.toUpperCase()} level).${jdContext}
 
 Evaluation Instructions:
 1. Provide objective scores (0-100) for:
@@ -492,7 +517,7 @@ Evaluation Instructions:
 3. Identify 3 concrete technical strengths and 3 high-impact areas for improvement.
 4. **Resume Rewrite Suggestions**:
    - Critically evaluate how the candidate's projects are described vs. the technical details, metrics, and architecture they explained in this interview.
-   - Generate 2-3 high-impact resume bullets tailored SPECIFICALLY to appeal to hiring managers for "${targetRole}".
+   - Generate 2-3 high-impact resume bullets tailored SPECIFICALLY to appeal to hiring managers for "${targetRole}"${jobDescription ? ' and the provided Job Description' : ''}.
    - Format each with the Google XYZ standard: "Accomplished [X] as measured by [Y], by doing [Z]".
    - Emphasize technical keywords, performance metrics, latency, scale, and active power verbs.`;
 
@@ -501,7 +526,7 @@ Evaluation Instructions:
         .join('\n\n');
 
       const user = `Target Role: ${targetRole} (${seniority})
-Candidate's Projects:
+${jobDescription ? `Job Description: ${jobDescription.slice(0, 1000)}\n` : ''}Candidate's Projects:
 ${topProjects.map((p) => `* ${p.title}: ${p.description} (Tech: ${p.skills.join(', ')})`).join('\n')}
 
 Interview Transcript:

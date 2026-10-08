@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     const interviewerType = (interviewSession.interviewerType as InterviewerType) || 'tech_lead';
 
     const rawRelevant = (interviewSession.relevantProjects as unknown as InterviewProject[]) || [];
-    const roleSetup = matchProjectsToRole(targetRole, rawRelevant);
+    const roleSetup = matchProjectsToRole(targetRole, rawRelevant, interviewSession.jobDescription);
 
     const existingMessages = (interviewSession.messages as unknown as InterviewMessage[]) || [];
 
@@ -62,6 +62,7 @@ export async function POST(req: Request) {
       matchedRoleSkills: roleSetup.matchedRoleSkills,
       expectedTopics: roleSetup.expectedTopics,
       messages: messagesWithUser,
+      jobDescription: interviewSession.jobDescription,
     });
 
     const assistantMessage: InterviewMessage = {

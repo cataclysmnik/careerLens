@@ -24,6 +24,7 @@ export async function POST(req: Request) {
       targetRole = 'Full Stack Developer',
       seniority = 'entry',
       interviewerType = 'tech_lead',
+      jobDescription = null,
     } = body;
 
     const evidenceRow = await prisma.studentEvidence.findUnique({
@@ -33,10 +34,11 @@ export async function POST(req: Request) {
     const storedEvidence = (evidenceRow?.evidence as unknown as StoredEvidence) || null;
     const allProjects = extractAllProjects(storedEvidence);
 
-    // Automatically match the student's relevant projects and skills for this role
+    // Automatically match the student's relevant projects and skills for this role & JD
     const { relevantProjects, matchedRoleSkills, expectedTopics } = matchProjectsToRole(
       targetRole,
-      allProjects
+      allProjects,
+      jobDescription
     );
 
     const opening = await generateJobInterviewOpening({
@@ -45,6 +47,7 @@ export async function POST(req: Request) {
       interviewerType: interviewerType as InterviewerType,
       relevantProjects,
       matchedRoleSkills,
+      jobDescription,
     });
 
     const initialMessage: InterviewMessage = {
@@ -64,6 +67,7 @@ export async function POST(req: Request) {
         projectTitle: relevantProjects[0]?.title || null,
         relevantProjects: relevantProjects as unknown as Prisma.InputJsonValue,
         roleFocus: 'job_mock_interview',
+        jobDescription: jobDescription || null,
         interviewerType,
         status: 'in_progress',
         messages: [initialMessage] as unknown as Prisma.InputJsonValue,

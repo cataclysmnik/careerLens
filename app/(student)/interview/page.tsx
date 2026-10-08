@@ -38,6 +38,7 @@ export default function InterviewPage() {
   // Active Session State
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [targetRole, setTargetRole] = useState<string>('Full Stack Developer');
+  const [jobDescription, setJobDescription] = useState<string | undefined>(undefined);
   const [seniority, setSeniority] = useState<SeniorityLevel>('entry');
   const [interviewerType, setInterviewerType] = useState<InterviewerType>('tech_lead');
   const [relevantProjects, setRelevantProjects] = useState<InterviewProject[]>([]);
@@ -75,6 +76,7 @@ export default function InterviewPage() {
 
   const handleStartSession = async (config: {
     targetRole: string;
+    jobDescription?: string;
     seniority: SeniorityLevel;
     interviewerType: InterviewerType;
   }) => {
@@ -102,6 +104,7 @@ export default function InterviewPage() {
 
       setCurrentSessionId(session.id);
       setTargetRole(config.targetRole);
+      setJobDescription(config.jobDescription);
       setSeniority(config.seniority);
       setInterviewerType(config.interviewerType);
       setRelevantProjects(matchedProjects || []);
@@ -236,6 +239,7 @@ export default function InterviewPage() {
           <InterviewChat
             sessionId={currentSessionId}
             targetRole={targetRole}
+            jobDescription={jobDescription}
             seniority={seniority}
             interviewerType={interviewerType}
             relevantProjects={relevantProjects}

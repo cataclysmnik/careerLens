@@ -26,6 +26,8 @@ import {
   type SeniorityLevel,
   type InterviewerType,
 } from '@/lib/interview/engine';
+import { getBasicJobDescription } from '@/lib/jobs/basic-jd';
+import { RotateCcw } from 'lucide-react';
 
 interface JobRoleSetupModalProps {
   allProjects: InterviewProject[];
@@ -33,6 +35,7 @@ interface JobRoleSetupModalProps {
   availableRoles: string[];
   onStartSession: (config: {
     targetRole: string;
+    jobDescription?: string;
     seniority: SeniorityLevel;
     interviewerType: InterviewerType;
   }) => Promise<void>;
@@ -52,20 +55,42 @@ export function JobRoleSetupModal({
   const [seniority, setSeniority] = useState<SeniorityLevel>('entry');
   const [interviewerType, setInterviewerType] = useState<InterviewerType>('tech_lead');
 
+  // Optional Job Description state
+  const [jobDescription, setJobDescription] = useState<string>(() =>
+    getBasicJobDescription(defaultRole || 'Full Stack Developer')
+  );
+  const [isCustomJd, setIsCustomJd] = useState<boolean>(false);
+
   const activeRole = isCustom && customRoleInput.trim() ? customRoleInput.trim() : selectedRole;
 
-  // Real-time automatic project & skill matching for the active role
+  // Real-time automatic project & skill matching for the active role + optional JD
   const { relevantProjects, matchedRoleSkills, expectedTopics } = useMemo(() => {
-    return matchProjectsToRole(activeRole, allProjects);
-  }, [activeRole, allProjects]);
+    return matchProjectsToRole(activeRole, allProjects, jobDescription.trim() || undefined);
+  }, [activeRole, allProjects, jobDescription]);
 
   const topRelevantProjects = relevantProjects.slice(0, 3);
+
+  const handleRoleSelect = (role: string) => {
+    setSelectedRole(role);
+    setIsCustom(false);
+    if (!isCustomJd) {
+      setJobDescription(getBasicJobDescription(role));
+    }
+  };
+
+  const handleCustomRoleChange = (role: string) => {
+    setCustomRoleInput(role);
+    if (!isCustomJd && role.trim()) {
+      setJobDescription(getBasicJobDescription(role.trim()));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeRole || isStarting) return;
     onStartSession({
       targetRole: activeRole,
+      jobDescription: jobDescription.trim() || undefined,
       seniority,
       interviewerType,
     });
@@ -161,7 +186,7 @@ export function JobRoleSetupModal({
               <input
                 type="text"
                 value={customRoleInput}
-                onChange={(e) => setCustomRoleInput(e.target.value)}
+                onChange={(e) => handleCustomRoleChange(e.target.value)}
                 placeholder="e.g. iOS Engineer, SRE, Blockchain Developer, Solutions Architect..."
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
@@ -174,10 +199,7 @@ export function JobRoleSetupModal({
                   <button
                     key={role}
                     type="button"
-                    onClick={() => {
-                      setSelectedRole(role);
-                      setIsCustom(false);
-                    }}
+                    onClick={() => handleRoleSelect(role)}
                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-500/30'
@@ -192,6 +214,65 @@ export function JobRoleSetupModal({
           )}
         </div>
 
+        {/* Step 1.5: Optional Job Description Input */}
+        <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                  Job Description <span className="text-xs font-normal text-gray-500 dark:text-gray-400">(Optional)</span>
+                </h3>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  jobDescription.trim() && isCustomJd
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                    : 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                }`}>
+                  {jobDescription.trim() && isCustomJd ? 'Custom Job Description Grounded' : 'Role Baseline Grounded'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Paste a specific target job posting to align questions and resume project probes with company requirements, or use the standard role baseline.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setJobDescription(getBasicJobDescription(activeRole));
+                  setIsCustomJd(false);
+                }}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Fill Standard JD
+              </button>
+              <span className="text-gray-300 dark:text-zinc-700">•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setJobDescription('');
+                  setIsCustomJd(true);
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <textarea
+            rows={5}
+            value={jobDescription}
+            onChange={(e) => {
+              setJobDescription(e.target.value);
+              setIsCustomJd(true);
+            }}
+            placeholder={`Optional: Paste the target job description for ${activeRole} here (responsibilities, required skills, tech stack)...`}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50/70 dark:bg-zinc-950 text-xs sm:text-sm font-mono text-gray-800 dark:text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 leading-relaxed"
+          />
+        </div>
+
         {/* Step 2: Automatic Role Project & Skill Alignment Preview */}
         <div className="rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 p-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -202,7 +283,7 @@ export function JobRoleSetupModal({
               </h3>
             </div>
             <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-              Auto-Matched Context
+              {jobDescription.trim() && isCustomJd ? 'Role + Custom JD Aligned' : 'Role Baseline Aligned'}
             </span>
           </div>
 

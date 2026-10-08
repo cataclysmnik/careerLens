@@ -23,6 +23,7 @@ import type { InterviewMessage, InterviewProject } from '@/lib/interview/engine'
 interface InterviewChatProps {
   sessionId: string;
   targetRole: string;
+  jobDescription?: string;
   seniority: string;
   interviewerType: string;
   relevantProjects: InterviewProject[];
@@ -37,6 +38,7 @@ interface InterviewChatProps {
 export function InterviewChat({
   sessionId,
   targetRole,
+  jobDescription,
   seniority,
   interviewerType,
   relevantProjects,
@@ -165,6 +167,11 @@ export function InterviewChat({
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${personaBadge.color}`}>
                 {personaBadge.label}
               </span>
+              {jobDescription && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                  Tailored to JD
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               <span className="capitalize font-medium text-gray-700 dark:text-gray-300">

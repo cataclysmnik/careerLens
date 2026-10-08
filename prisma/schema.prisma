@@ -159,6 +159,7 @@ model InterviewSession {
   projectTitle     String?  // primary project or summary
   relevantProjects Json?    // Array of relevant projects used in this interview
   roleFocus        String?  // mixed_real_world, technical_deep_dive
+  jobDescription   String?  // Optional target job description provided for the interview
   interviewerType  String   @default("tech_lead") // tech_lead, bar_raiser, friendly
   status           String   @default("in_progress") // in_progress, completed
   overallScore     Int?     // 0-100

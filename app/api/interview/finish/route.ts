@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const targetRole = interviewSession.roleTitle || 'Software Engineer';
     const seniority = (interviewSession.seniority as SeniorityLevel) || 'entry';
     const rawRelevant = (interviewSession.relevantProjects as unknown as InterviewProject[]) || [];
-    const roleSetup = matchProjectsToRole(targetRole, rawRelevant);
+    const roleSetup = matchProjectsToRole(targetRole, rawRelevant, interviewSession.jobDescription);
 
     const messages = (interviewSession.messages as unknown as InterviewMessage[]) || [];
 
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
       seniority,
       relevantProjects: roleSetup.relevantProjects,
       messages,
+      jobDescription: interviewSession.jobDescription,
     });
 
     const updatedSession = await prisma.interviewSession.update({
