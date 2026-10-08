@@ -16,6 +16,7 @@ const navItems = [
   { name: 'AI Mock Interview', href: '/interview', icon: BotMessageSquare },
   { name: 'My Profile', href: '/profile', icon: User },
   { name: 'Resume Parser', href: '/profile/resume', icon: FileText },
+  { name: 'LinkedIn Parser', href: '/profile/linkedin', icon: Globe }, // Use Globe or a distinct icon here
   { name: 'GitHub Analyzer', href: '/profile/github', icon: GitFork },
   { name: 'Coding Profiles', href: '/profile/coding', icon: Trophy },
   { name: 'Portfolio Scanner', href: '/profile/portfolio', icon: Globe },
@@ -51,11 +52,13 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('careerlens:analysis-updated', onAnalysisUpdated);
   }, [checkAnalysis]);
 
-  const visibleItems = hasAnalysis ? navItems : navItems.filter((item) => item.href === RESUME_HREF);
+  const visibleItems = hasAnalysis !== false 
+    ? navItems 
+    : navItems.filter((item) => item.href === RESUME_HREF || item.href === '/profile/linkedin');
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-black font-sans text-gray-900 dark:text-gray-100 overflow-hidden">
-      <aside className="w-64 bg-white dark:bg-zinc-950 border-r border-gray-200 dark:border-zinc-800 flex flex-col hidden md:flex">
+    <div className="flex h-screen bg-transparent font-sans text-gray-900 dark:text-gray-100 overflow-hidden">
+      <aside className="w-64 bg-white dark:bg-zinc-950 border-r border-gray-200 dark:border-zinc-800 flex flex-col hidden md:flex shadow-sm z-10">
         <div className="h-16 flex items-center justify-between px-6 border-b border-gray-200 dark:border-zinc-800">
           <div className="flex items-center">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold mr-3">C</div>
@@ -84,7 +87,7 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
           })}
           {hasAnalysis === false && (
             <p className="px-3 pt-3 text-xs text-gray-500 dark:text-gray-400">
-              Upload and confirm your resume to unlock your dashboard, job matcher and profile tools.
+              Upload your resume or add your LinkedIn to unlock your dashboard and profile tools.
             </p>
           )}
         </nav>
@@ -99,7 +102,9 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <div key={pathname} className="animate-page-transition h-full">
+            {children}
+          </div>
         </main>
       </div>
     </div>

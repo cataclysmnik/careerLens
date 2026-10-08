@@ -9,6 +9,12 @@ import { SIGNUP_ROLE_COOKIE } from "@/lib/signupRole"
 import { cookies } from "next/headers"
 import { ipv4Fetch } from "@/lib/ipv4Fetch"
 
+// Dev only: every `next dev` run gets an id, and logins from an earlier run are
+// signed out, so restarting the dev server always starts logged out. Kept on
+// globalThis so hot reloads and the proxy (same process) share one id.
+const devGlobal = globalThis as typeof globalThis & { __careerLensDevRunId?: string }
+const DEV_RUN_ID = process.env.NODE_ENV === "development" ? (devGlobal.__careerLensDevRunId ??= crypto.randomUUID()) : null
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
@@ -101,6 +107,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return true
     },
     async jwt({ token, user, trigger }) {
+      if (DEV_RUN_ID) {
+        if (user) token.devRunId = DEV_RUN_ID
+        else if (token.devRunId !== DEV_RUN_ID) return null // from a previous dev run: sign out
+      }
       if (trigger === "update" && token.sub) {
         // Profile edits change the display name; refresh it from the DB
         // rather than trusting client-supplied session data.

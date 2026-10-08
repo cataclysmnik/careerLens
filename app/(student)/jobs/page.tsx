@@ -84,7 +84,13 @@ export default function StudentJobsPage() {
           ))}
         </div>
 
-        {!listings && <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>}
+        {!listings && (
+          <div className="space-y-4 w-full animate-pulse mt-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+            ))}
+          </div>
+        )}
         {listings && visible.length === 0 && (
           <div className={`${cardClass} p-10 text-center text-sm text-gray-500`}>
             {filter === 'open' ? 'No open listings right now. You’ll get a notification when one is published.' : 'You haven’t applied to anything yet.'}

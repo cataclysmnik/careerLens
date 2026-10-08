@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db/prisma"
 import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO, parseCodingHandle } from "@/lib/coding/handles"
+import { Prisma } from "@prisma/client"
+import { readInputs, buildStudentEvidence, type StoredEvidence } from "@/lib/evidence/student-evidence"
+import { canonicalizeSkill } from "@/lib/scoring/skill-taxonomy"
 
 const USER_SELECT = {
   id: true,
@@ -31,6 +34,9 @@ const USER_SELECT = {
       codechefUsername: true,
       hackerrankUsername: true,
       gfgUsername: true,
+      kaggleUsername: true,
+      branch: true,
+      registerNumber: true,
     },
   },
 } as const
@@ -139,16 +145,71 @@ export async function PATCH(req: Request) {
       cgpa: optionalNumber(body.cgpa, "CGPA", 10),
       tenthPercentage: optionalNumber(body.tenthPercentage, "10th percentage", 100),
       twelfthPercentage: optionalNumber(body.twelfthPercentage, "12th percentage", 100),
+      branch: optionalText(body.branch, 10),
+      registerNumber: optionalText(body.registerNumber, 20),
       ...codingHandles(body),
     }
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
       data: {
         name,
         profile: { upsert: { create: profile, update: profile } },
       },
+      include: { profile: true }
     })
+
+    const row = await prisma.studentEvidence.findUnique({ where: { userId: session.user.id } })
+    if (row && updatedUser.profile) {
+      const inputs = readInputs(row.evidence)
+      if (inputs) {
+        const existingIds = new Set(inputs.profile.skills.map((s) => canonicalizeSkill(s.name).id))
+        for (const s of updatedUser.profile.skills) {
+           const id = canonicalizeSkill(s).id
+           if (!existingIds.has(id)) {
+              inputs.profile.skills.push({ name: s, listedInSkillsSection: true, kind: 'technical' })
+           }
+        }
+        
+        inputs.profile.links.github = updatedUser.profile.githubUsername ? `https://github.com/${updatedUser.profile.githubUsername}` : null
+        inputs.profile.links.portfolio = updatedUser.profile.portfolioUrl || null
+        inputs.profile.links.linkedin = updatedUser.profile.linkedinUrl || null
+        
+        if (updatedUser.profile.cgpa !== null) {
+          const ug = inputs.profile.education.find((e) => e.level === 'undergraduate')
+          if (ug) {
+            ug.score = { type: 'cgpa', value: updatedUser.profile.cgpa, outOf: 10 }
+          } else {
+            inputs.profile.education.push({ level: 'undergraduate', degree: null, field: null, institution: null, board: null, startYear: null, endYear: null, isOngoing: false, score: { type: 'cgpa', value: updatedUser.profile.cgpa, outOf: 10 } })
+          }
+        }
+        if (updatedUser.profile.twelfthPercentage !== null) {
+          const hs = inputs.profile.education.find((e) => e.level === 'class12')
+          if (hs) hs.score = { type: 'percentage', value: updatedUser.profile.twelfthPercentage, outOf: 100 }
+        }
+        if (updatedUser.profile.tenthPercentage !== null) {
+          const hs = inputs.profile.education.find((e) => e.level === 'class10')
+          if (hs) hs.score = { type: 'percentage', value: updatedUser.profile.tenthPercentage, outOf: 100 }
+        }
+
+        const storedEv = row.evidence as unknown as StoredEvidence;
+        const { evidence, scoring } = buildStudentEvidence(
+          inputs.profile,
+          storedEv.githubSnapshot ?? null,
+          inputs.portfolio,
+          inputs.coding ?? null,
+          updatedUser.profile.targetRole
+        )
+        
+        await prisma.studentEvidence.update({
+          where: { userId: session.user.id },
+          data: {
+             evidence: evidence as unknown as Prisma.InputJsonValue,
+             scoring: scoring as unknown as Prisma.InputJsonValue,
+          }
+        })
+      }
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Invalid input"
     return NextResponse.json({ error: message }, { status: 400 })

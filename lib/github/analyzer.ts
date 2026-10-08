@@ -36,7 +36,10 @@ export function analyzeGithubProfile(repos: GithubRepo[]): GithubSkillEvidence[]
   const sixMonthsAgo = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
 
   repos.forEach(repo => {
-    const isRecent = new Date(repo.updated_at) > sixMonthsAgo;
+    let isRecent = new Date(repo.updated_at) > sixMonthsAgo;
+    if (repo.commits && repo.commits.length > 0) {
+      isRecent = repo.commits.some(c => new Date(c.date) > sixMonthsAgo);
+    }
     
     // Extract skills from language and topics
     const repoSkills = new Set<string>();

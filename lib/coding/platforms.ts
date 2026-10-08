@@ -234,12 +234,21 @@ async function gfg(handle: string): Promise<Omit<CodingPlatformStats, 'score'>> 
   };
 }
 
+async function kaggle(handle: string): Promise<Omit<CodingPlatformStats, 'score'>> {
+  // Kaggle doesn't have a simple public unauthenticated API for user stats.
+  // We just return a blank profile that will store the handle.
+  return {
+    ...blank('kaggle', handle),
+  };
+}
+
 const FETCHERS: Record<CodingPlatform, (handle: string) => Promise<Omit<CodingPlatformStats, 'score'>>> = {
   leetcode,
   codeforces,
   codechef,
   hackerrank,
   gfg,
+  kaggle,
 };
 
 export async function fetchCodingProfile(platform: CodingPlatform, handle: string): Promise<CodingPlatformStats> {

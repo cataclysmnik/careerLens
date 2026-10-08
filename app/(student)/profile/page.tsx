@@ -13,6 +13,7 @@ import { ROLE_BADGE_CLASS, ROLE_LABEL } from '@/lib/roles';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import { profileChecklist, profileCompleteness } from '@/lib/profileCompleteness';
 import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO } from '@/lib/coding/handles';
+import { ROLE_CATALOG } from '@/lib/scoring/roles-catalog';
 
 const EXPERIENCE_LEVELS = [
   'Student / Fresher',
@@ -40,6 +41,9 @@ type FormState = {
   codechefUsername: string;
   hackerrankUsername: string;
   gfgUsername: string;
+  kaggleUsername: string;
+  branch: string;
+  registerNumber: string;
 };
 
 const numToText = (n: number | null | undefined) => (n == null ? '' : String(n));
@@ -64,6 +68,9 @@ function toForm(me: Me): FormState {
     codechefUsername: p?.codechefUsername ?? '',
     hackerrankUsername: p?.hackerrankUsername ?? '',
     gfgUsername: p?.gfgUsername ?? '',
+    kaggleUsername: p?.kaggleUsername ?? '',
+    branch: p?.branch ?? '',
+    registerNumber: p?.registerNumber ?? '',
   };
 }
 
@@ -107,6 +114,19 @@ export default function ProfilePage() {
     setForm((f) => (f ? { ...f, [key]: e.target.value } : f));
   };
 
+  const handleRegisterNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSaved(false);
+    const val = e.target.value.toUpperCase();
+    setForm((f) => {
+      if (!f) return f;
+      let branch = f.branch;
+      if (/^\d{2}[A-Z]{3}\d{4}$/.test(val)) {
+        branch = val.substring(2, 5);
+      }
+      return { ...f, registerNumber: val, branch };
+    });
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
@@ -140,7 +160,22 @@ export default function ProfilePage() {
     return <div className="p-10 text-center text-sm text-red-500">{loadError}</div>;
   }
   if (!me || !form) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+    return (
+      <div className="max-w-3xl mx-auto space-y-8 animate-pulse p-4 md:p-8 mt-10">
+        <div className="flex flex-col md:flex-row items-center gap-6 mb-8 text-center md:text-left">
+          <div className="w-24 h-24 bg-gray-200 dark:bg-zinc-800 rounded-full"></div>
+          <div className="space-y-3 flex-1">
+            <div className="h-8 w-64 bg-gray-200 dark:bg-zinc-800 rounded mx-auto md:mx-0"></div>
+            <div className="h-4 w-40 bg-gray-200 dark:bg-zinc-800 rounded mx-auto md:mx-0"></div>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {[...Array(4)].map((_, i) => (
+             <div key={i} className="h-20 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const p = me.profile;
@@ -291,7 +326,19 @@ export default function ProfilePage() {
                 <label htmlFor="targetRole" className={labelClass}>
                   <Target className="inline w-3.5 h-3.5 mr-1" />Target role
                 </label>
-                <input id="targetRole" value={form.targetRole} onChange={set('targetRole')} className={inputClass} placeholder="e.g. Full Stack Developer" />
+                <select id="targetRole" value={form.targetRole} onChange={set('targetRole')} className={inputClass}>
+                  <option value="">Select a target role…</option>
+                  {ROLE_CATALOG.map((role) => (
+                    <option key={role.id} value={role.title}>{role.title}</option>
+                  ))}
+                  {form.targetRole && !ROLE_CATALOG.some(r => r.title === form.targetRole) && (
+                    <option value={form.targetRole}>{form.targetRole}</option>
+                  )}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="registerNumber" className={labelClass}>Register Number</label>
+                <input id="registerNumber" value={form.registerNumber} onChange={handleRegisterNumberChange} pattern="^\d{2}[A-Za-z]{3}\d{4}$" title="Format: 2 digits, 3 letters, 4 digits (e.g., 24BRS1242)" className={inputClass} placeholder="e.g. 24BRS1242" />
               </div>
               <div>
                 <label htmlFor="experienceLevel" className={labelClass}>
@@ -318,6 +365,10 @@ export default function ProfilePage() {
                 <label htmlFor="preferredIndustries" className={labelClass}>Preferred industries</label>
                 <input id="preferredIndustries" value={form.preferredIndustries} onChange={set('preferredIndustries')} className={inputClass} placeholder="Fintech, SaaS, EdTech" />
                 <p className="mt-1 text-xs text-gray-500">Comma-separated.</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="branch" className={labelClass}>Branch / Department</label>
+                <input id="branch" value={form.branch} readOnly className={`${inputClass} bg-gray-100 dark:bg-zinc-800/50 cursor-not-allowed`} placeholder="Auto-filled from Register Number" />
               </div>
             </div>
 

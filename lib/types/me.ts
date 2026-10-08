@@ -17,6 +17,9 @@ export type MeProfile = {
   codechefUsername: string | null
   hackerrankUsername: string | null
   gfgUsername: string | null
+  kaggleUsername: string | null
+  branch: string | null
+  registerNumber: string | null
 }
 
 export type Me = {

@@ -14,6 +14,7 @@ export type GithubRepo = {
   has_issues: boolean;
   default_branch: string;
   rootFiles?: string[];
+  commits?: { date: string; message: string }[];
 };
 
 export async function fetchUserRepositories(username: string): Promise<GithubRepo[]> {
@@ -70,6 +71,32 @@ export async function fetchUserRepositories(username: string): Promise<GithubRep
           const contents = await contentRes.json();
           if (Array.isArray(contents)) {
             repo.rootFiles = contents.map((c: any) => c.name);
+            
+            if (repo.rootFiles?.includes('package.json')) {
+              try {
+                const pkgRes = await fetch(`https://api.github.com/repos/${username}/${repo.name}/contents/package.json`, {
+                  headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    ...(process.env.GITHUB_TOKEN ? { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } : {})
+                  },
+                  cache: 'no-store'
+                });
+                if (pkgRes.ok) {
+                  const pkgData = await pkgRes.json();
+                  if (pkgData.content) {
+                    const pkgStr = Buffer.from(pkgData.content, 'base64').toString('utf8');
+                    const pkg = JSON.parse(pkgStr);
+                    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+                    if (deps['react']) repo.topics.push('react');
+                    if (deps['vue']) repo.topics.push('vue');
+                    if (deps['express']) repo.topics.push('express');
+                    if (deps['mongoose']) repo.topics.push('mongodb');
+                    if (deps['tailwindcss']) repo.topics.push('tailwind');
+                    if (deps['next']) repo.topics.push('nextjs');
+                  }
+                }
+              } catch (e) {}
+            }
           }
         }
         
@@ -93,6 +120,27 @@ export async function fetchUserRepositories(username: string): Promise<GithubRep
         }
       } catch (e) {
         // Silently fail root/readme file fetch, keep base repo data
+      }
+      
+      try {
+        const commitsRes = await fetch(`https://api.github.com/repos/${username}/${repo.name}/commits?author=${username}&per_page=100`, {
+          headers: {
+            'Accept': 'application/vnd.github.v3+json',
+            ...(process.env.GITHUB_TOKEN ? { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } : {})
+          },
+          cache: 'no-store'
+        });
+        if (commitsRes.ok) {
+          const commits = await commitsRes.json();
+          if (Array.isArray(commits)) {
+            repo.commits = commits.map((c: any) => ({
+              date: c.commit.author.date,
+              message: c.commit.message
+            }));
+          }
+        }
+      } catch (e) {
+        // Silently fail commits fetch
       }
     }));
 

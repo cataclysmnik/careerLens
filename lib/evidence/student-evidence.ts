@@ -16,6 +16,7 @@ import { toGithubInput, type EvidenceInputs } from '@/lib/scoring/evidence-input
 import { calculateReadiness, type ScoringResult } from '@/lib/scoring/engine';
 import { SCORING_VERSION } from '@/lib/scoring/config';
 import { skillLabel, canonicalizeSkill } from '@/lib/scoring/skill-taxonomy';
+import { findRoleByTarget } from '@/lib/scoring/roles-catalog';
 
 /** The last GitHub analysis, kept so the GitHub Analyzer reopens with it. */
 export type GithubSnapshot = GithubAnalyzeData & { analyzedAt: string };
@@ -140,7 +141,20 @@ export function currentScoring(
 ): { scoring: ScoringResult | null; changed: boolean } {
   const stored = scoring as Partial<ScoringResult> | null;
   const inputs = readInputs(evidence);
-  if (!inputs || stored?.scoringVersion === SCORING_VERSION) {
+  
+  let roleChanged = false;
+  if (targetRole) {
+     const roleDef = findRoleByTarget(targetRole);
+     if (roleDef && stored?.roleAlignment?.roleId !== roleDef.id) {
+         roleChanged = true;
+     }
+  } else {
+     if (stored?.roleAlignment?.matchedBy === 'target_role') {
+         roleChanged = true;
+     }
+  }
+
+  if (!inputs || (stored?.scoringVersion === SCORING_VERSION && !roleChanged)) {
     return { scoring: (stored as ScoringResult | null) ?? null, changed: false };
   }
   // Keep the original asOf so recency is measured from when the evidence was collected.

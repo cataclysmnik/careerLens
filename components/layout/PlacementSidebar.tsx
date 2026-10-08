@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, ShieldCheck, Bell, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldCheck, Bell, ClipboardList, Settings2 } from 'lucide-react';
 import { SidebarUserCard } from './SidebarUserCard';
 
 const navItems = [
@@ -12,14 +12,15 @@ const navItems = [
   { name: 'Job Listings', href: '/placement/jobs', icon: ClipboardList },
   { name: 'Approvals', href: '/placement/approvals', icon: ShieldCheck },
   { name: 'Notifications', href: '/placement/notifications', icon: Bell },
+  { name: 'Settings', href: '/placement/settings', icon: Settings2 },
 ];
 
 export function PlacementSidebar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-black font-sans text-gray-900 dark:text-gray-100 overflow-hidden">
-      <aside className="w-64 bg-white dark:bg-zinc-950 border-r border-gray-200 dark:border-zinc-800 flex flex-col hidden md:flex">
+    <div className="flex h-screen bg-transparent font-sans text-gray-900 dark:text-gray-100 overflow-hidden">
+      <aside className="w-64 bg-white dark:bg-zinc-950 border-r border-gray-200 dark:border-zinc-800 flex flex-col hidden md:flex shadow-sm z-10">
         <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-zinc-800">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold mr-3">C</div>
           <span className="font-bold text-lg tracking-tight">CareerLens</span>
@@ -55,7 +56,9 @@ export function PlacementSidebar({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <div key={pathname} className="animate-page-transition h-full">
+            {children}
+          </div>
         </main>
       </div>
     </div>

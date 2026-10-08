@@ -36,6 +36,7 @@ type Stats = {
   needsAttention: BriefStudent[];
   recentlyAnalyzed: BriefStudent[];
   pendingApprovals: number;
+  branchInsights: { branch: string; students: number; avgScore: number; commonGap: string | null; gapPct: number }[];
 };
 
 const card = 'bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6';
@@ -202,6 +203,39 @@ export default function PlacementOverviewPage() {
                   <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
                   <span className="flex-1">{g.title}</span>
                   <span className="text-gray-500 whitespace-nowrap">{g.count} · {g.pct}%</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyNote />
+          )}
+        </div>
+
+        <div className={card}>
+          <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" /> Batch Insights by Branch
+          </h3>
+          {stats.branchInsights.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {stats.branchInsights.map((b) => (
+                <div key={b.branch} className="border border-gray-100 dark:border-zinc-800 rounded-lg p-4 bg-gray-50/50 dark:bg-zinc-800/30">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">{b.branch}</span>
+                    <span className="text-xs font-medium bg-gray-200 dark:bg-zinc-700 px-2 py-0.5 rounded-full">{b.students} students</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mb-1">
+                    <span className="text-gray-500">Avg Score</span>
+                    <span className={`font-bold ${scoreTextClass(b.avgScore)}`}>{b.avgScore}</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full mb-3 overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${b.avgScore}%` }} />
+                  </div>
+                  {b.commonGap && (
+                    <div className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5 bg-amber-50 dark:bg-amber-900/10 p-2 rounded">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span><span className="font-semibold">{b.gapPct}%</span> of this branch lacks <span className="font-semibold">{b.commonGap}</span></span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

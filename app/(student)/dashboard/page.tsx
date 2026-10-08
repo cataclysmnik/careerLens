@@ -64,7 +64,26 @@ export default function DashboardPage() {
   }, []);
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+    return (
+      <div className="max-w-7xl mx-auto space-y-6 animate-pulse p-4 md:p-8">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-14 h-14 bg-gray-200 dark:bg-zinc-800 rounded-full"></div>
+          <div className="space-y-2">
+            <div className="h-6 w-48 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+            <div className="h-4 w-32 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="h-40 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+          <div className="col-span-2 h-40 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+           {[...Array(4)].map((_, i) => (
+             <div key={i} className="h-28 bg-gray-200 dark:bg-zinc-800 rounded-xl"></div>
+           ))}
+        </div>
+      </div>
+    );
   }
 
   const firstName = me?.name?.trim().split(/\s+/)[0];
@@ -304,7 +323,17 @@ export default function DashboardPage() {
 
         {evidence?.inputs?.profile && (
           <div className="mb-6">
-            <ExtractedProfile profile={evidence.inputs.profile} compact />
+            <ExtractedProfile 
+              profile={{
+                ...evidence.inputs.profile,
+                education: [
+                  ...(evidence.inputs.profile.education?.filter(e => e.level !== 'class10' && e.level !== 'class12') ?? []),
+                  ...(me?.profile?.tenthPercentage != null ? [{ level: 'class10' as const, degree: null, field: null, institution: null, board: null, startYear: null, endYear: null, isOngoing: false, score: { type: 'percentage' as const, value: me.profile.tenthPercentage, outOf: 100 } }] : (evidence.inputs.profile.education?.filter(e => e.level === 'class10') ?? [])),
+                  ...(me?.profile?.twelfthPercentage != null ? [{ level: 'class12' as const, degree: null, field: null, institution: null, board: null, startYear: null, endYear: null, isOngoing: false, score: { type: 'percentage' as const, value: me.profile.twelfthPercentage, outOf: 100 } }] : (evidence.inputs.profile.education?.filter(e => e.level === 'class12') ?? []))
+                ]
+              }} 
+              compact 
+            />
           </div>
         )}
 
