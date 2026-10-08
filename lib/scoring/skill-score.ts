@@ -461,7 +461,11 @@ function activeMonths(repos: RepoSignals[], roles: EvidenceInputs['profile']['ex
   cutoff.setUTCMonth(cutoff.getUTCMonth() - 12);
   const months = new Set<string>();
   const add = (d: Date | null) => { if (d && d >= cutoff && d <= asOf) months.add(`${d.getUTCFullYear()}-${d.getUTCMonth()}`); };
-  repos.forEach((r) => { add(r.lastActivity); add(r.createdAt); });
+  repos.forEach((r) => { 
+    add(r.lastActivity); 
+    add(r.createdAt); 
+    r.commitDates.forEach(add);
+  });
   for (const x of roles) {
     const start = parseResumeDate(x.startDate);
     const end = x.isCurrent ? asOf : parseResumeDate(x.endDate, true);

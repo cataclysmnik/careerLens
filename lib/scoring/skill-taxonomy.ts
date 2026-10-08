@@ -52,6 +52,7 @@ const SKILLS: SkillDef[] = [
 
   // Frontend
   { id: 'react', label: 'React', category: 'frontend', aliases: ['react.js', 'reactjs', 'react js'], implies: ['javascript'] },
+  { id: 'react-typescript', label: 'React/TypeScript', category: 'frontend', aliases: ['react/typescript', 'react / typescript', 'react/ts', 'react + ts', 'react+ts'], implies: ['react', 'typescript'] },
   { id: 'nextjs', label: 'Next.js', category: 'frontend', aliases: ['next.js', 'next', 'next js'], implies: ['react', 'javascript'] },
   { id: 'vue', label: 'Vue', category: 'frontend', aliases: ['vue.js', 'vuejs'], implies: ['javascript'] },
   { id: 'nuxt', label: 'Nuxt.js', category: 'frontend', aliases: ['nuxt.js', 'nuxtjs'], implies: ['vue'] },

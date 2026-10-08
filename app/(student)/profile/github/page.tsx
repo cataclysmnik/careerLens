@@ -176,7 +176,7 @@ export default function GithubIntegrationPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {results.evidence.map((ev, idx) => (
+              {(results.evidence || []).map((ev, idx) => (
                 <details key={idx} className="group bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors [&_summary::-webkit-details-marker]:hidden">
                   <summary className="list-none cursor-pointer p-5 focus:outline-none">
                     <div className="flex items-start justify-between mb-3">

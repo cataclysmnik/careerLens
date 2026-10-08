@@ -82,6 +82,10 @@ model Profile {
   codechefUsername    String?
   hackerrankUsername  String?
   gfgUsername         String?
+  kaggleUsername      String?
+  branch              String?
+  registerNumber      String?
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

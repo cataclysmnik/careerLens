@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Briefcase, Target, Loader2, ShieldCheck, Sparkles, Globe } from 'lucide-react';
+import { Briefcase, Target, Loader2, ShieldCheck, Sparkles, Globe, FileText, Search } from 'lucide-react';
 import type { JobFitResult } from '@/lib/scoring/jobMatch';
 import { JobFitReport } from '@/components/matcher/JobFitReport';
 import { ROLE_CATALOG } from '@/lib/scoring/roles-catalog';
@@ -15,7 +15,9 @@ const SUGGESTED_ROLES = [
 ].filter((r, i, all) => all.indexOf(r) === i);
 
 export default function JobMatcherPage() {
+  const [mode, setMode] = useState<'role' | 'jd'>('role');
   const [role, setRole] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<JobFitResult | null>(null);
@@ -42,7 +44,8 @@ export default function JobMatcherPage() {
 
   const handleMatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role.trim().length < 2) return;
+    if (mode === 'role' && role.trim().length < 2) return;
+    if (mode === 'jd' && jobDescription.trim().length < 40) return;
 
     setIsAnalyzing(true);
     setError(null);
@@ -52,7 +55,7 @@ export default function JobMatcherPage() {
       const res = await fetch('/api/jobs/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: role.trim() }),
+        body: JSON.stringify(mode === 'role' ? { role: role.trim() } : { jobDescription: jobDescription.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Matching failed');
@@ -101,41 +104,66 @@ export default function JobMatcherPage() {
         </div>
 
         <form onSubmit={handleMatch} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex border-b border-gray-200 dark:border-zinc-800">
+            <button type="button" onClick={() => setMode('role')} className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mode === 'role' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/10' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>
+              <Search className="w-4 h-4" /> Live Market Research
+            </button>
+            <button type="button" onClick={() => setMode('jd')} className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mode === 'jd' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/10' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>
+              <FileText className="w-4 h-4" /> Custom Job Description
+            </button>
+          </div>
+
           <div className="p-6">
-            <label htmlFor="role" className="block text-sm font-semibold mb-2">Job role you&apos;re seeking</label>
-            <input
-              id="role"
-              list="role-suggestions"
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. Backend Developer, Data Analyst, Android Developer"
-              value={role}
-              maxLength={80}
-              onChange={(e) => setRole(e.target.value)}
-              required
-            />
-            <datalist id="role-suggestions">
-              {SUGGESTED_ROLES.map((r) => <option key={r} value={r} />)}
-            </datalist>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {SUGGESTED_ROLES.slice(0, 8).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRole(r)}
-                  className={`px-3 py-1 rounded-full text-xs border transition-colors ${role === r ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-300 hover:border-blue-400'}`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
+            {mode === 'role' ? (
+              <>
+                <label htmlFor="role" className="block text-sm font-semibold mb-2">Job role you&apos;re seeking</label>
+                <input
+                  id="role"
+                  list="role-suggestions"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. Backend Developer, Data Analyst, Android Developer"
+                  value={role}
+                  maxLength={80}
+                  onChange={(e) => setRole(e.target.value)}
+                  required
+                />
+                <datalist id="role-suggestions">
+                  {SUGGESTED_ROLES.map((r) => <option key={r} value={r} />)}
+                </datalist>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {SUGGESTED_ROLES.slice(0, 8).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRole(r)}
+                      className={`px-3 py-1 rounded-full text-xs border transition-colors ${role === r ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-300 hover:border-blue-400'}`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <label htmlFor="jobDescription" className="block text-sm font-semibold mb-2">Paste Job Description</label>
+                <textarea
+                  id="jobDescription"
+                  className="w-full h-40 px-4 py-3 bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Paste the full text of a job posting here..."
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  required
+                />
+              </>
+            )}
           </div>
           <div className="px-6 py-4 bg-gray-50 dark:bg-zinc-950/50 border-t border-gray-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
             <span className="text-xs text-gray-500 flex items-center gap-1">
-              <Globe className="w-4 h-4" /> Live job postings <ShieldCheck className="w-4 h-4 ml-2" /> your saved evidence
+              <Globe className="w-4 h-4" /> {mode === 'role' ? 'Live job postings' : 'Custom job post'} <ShieldCheck className="w-4 h-4 ml-2" /> your saved evidence
             </span>
             <button
               type="submit"
-              disabled={isAnalyzing || role.trim().length < 2}
+              disabled={isAnalyzing || (mode === 'role' ? role.trim().length < 2 : jobDescription.trim().length < 40)}
               className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
               {isAnalyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing…</> : <><Target className="w-4 h-4" /> Check My Fit</>}

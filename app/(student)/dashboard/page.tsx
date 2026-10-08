@@ -304,7 +304,17 @@ export default function DashboardPage() {
 
         {evidence?.inputs?.profile && (
           <div className="mb-6">
-            <ExtractedProfile profile={evidence.inputs.profile} compact />
+            <ExtractedProfile 
+              profile={{
+                ...evidence.inputs.profile,
+                education: [
+                  ...(evidence.inputs.profile.education?.filter(e => e.level !== 'class10' && e.level !== 'class12') ?? []),
+                  ...(me?.profile?.tenthPercentage != null ? [{ level: 'class10' as const, degree: null, field: null, institution: null, board: null, startYear: null, endYear: null, isOngoing: false, score: { type: 'percentage' as const, value: me.profile.tenthPercentage, outOf: 100 } }] : (evidence.inputs.profile.education?.filter(e => e.level === 'class10') ?? [])),
+                  ...(me?.profile?.twelfthPercentage != null ? [{ level: 'class12' as const, degree: null, field: null, institution: null, board: null, startYear: null, endYear: null, isOngoing: false, score: { type: 'percentage' as const, value: me.profile.twelfthPercentage, outOf: 100 } }] : (evidence.inputs.profile.education?.filter(e => e.level === 'class12') ?? []))
+                ]
+              }} 
+              compact 
+            />
           </div>
         )}
 

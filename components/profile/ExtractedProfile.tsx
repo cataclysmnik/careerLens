@@ -45,6 +45,17 @@ export function ExtractedProfile({ profile, compact = false }: { profile: Candid
         </div>
       )}
 
+      {profile.feedback && profile.feedback.length > 0 && (
+        <div className="flex gap-2 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-900/50 text-sm text-indigo-800 dark:text-indigo-300">
+          <div className="flex-1">
+            <h4 className="font-semibold mb-2">AI Resume & Portfolio Feedback</h4>
+            <ul className="list-disc list-inside space-y-1">
+              {profile.feedback.map((f, i) => <li key={i}>{f}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <div className={card}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold flex items-center gap-2"><GraduationCap className="w-4 h-4 text-blue-600" /> Academics</h3>

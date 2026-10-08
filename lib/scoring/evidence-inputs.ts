@@ -12,6 +12,7 @@ import { DOCKER_MILESTONES, TESTING_MILESTONES } from './config';
 export type GithubRepoLite = Pick<GithubRepo, 'name' | 'description' | 'language' | 'topics' | 'updated_at' | 'rootFiles' | 'fork' | 'homepage'> & {
   created_at?: string | null;
   pushed_at?: string | null;
+  commits?: { date: string; message: string }[];
 };
 
 export type GithubInput = {
@@ -47,6 +48,7 @@ export function toGithubInput(data: { username: string; totalRepos: number; repo
       pushed_at: r.pushed_at ?? null,
       fork: r.fork ?? false,
       homepage: r.homepage ?? null,
+      commits: r.commits,
     })),
   };
 }
@@ -71,6 +73,7 @@ export type RepoSignals = {
   testingMentioned: boolean;
   lastActivity: Date | null;
   createdAt: Date | null;
+  commitDates: Date[];
 };
 
 const ROOT_FILE_SKILLS: [RegExp, string[]][] = [
@@ -134,6 +137,7 @@ export function repoSignals(repo: GithubRepoLite): RepoSignals {
     testingMentioned: /\btest|jest|pytest|cypress|vitest/.test(text),
     lastActivity: last ? new Date(last) : null,
     createdAt: repo.created_at ? new Date(repo.created_at) : null,
+    commitDates: (repo.commits ?? []).map(c => new Date(c.date)),
   };
 }
 

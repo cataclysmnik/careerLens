@@ -15,6 +15,7 @@ const navItems = [
   { name: 'Job Matcher', href: '/matcher', icon: Briefcase },
   { name: 'My Profile', href: '/profile', icon: User },
   { name: 'Resume Parser', href: '/profile/resume', icon: FileText },
+  { name: 'LinkedIn Parser', href: '/profile/linkedin', icon: Globe }, // Use Globe or a distinct icon here
   { name: 'GitHub Analyzer', href: '/profile/github', icon: GitFork },
   { name: 'Coding Profiles', href: '/profile/coding', icon: Trophy },
   { name: 'Portfolio Scanner', href: '/profile/portfolio', icon: Globe },
@@ -50,7 +51,9 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('careerlens:analysis-updated', onAnalysisUpdated);
   }, [checkAnalysis]);
 
-  const visibleItems = hasAnalysis ? navItems : navItems.filter((item) => item.href === RESUME_HREF);
+  const visibleItems = hasAnalysis !== false 
+    ? navItems 
+    : navItems.filter((item) => item.href === RESUME_HREF || item.href === '/profile/linkedin');
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-black font-sans text-gray-900 dark:text-gray-100 overflow-hidden">
@@ -83,7 +86,7 @@ export function StudentSidebar({ children }: { children: React.ReactNode }) {
           })}
           {hasAnalysis === false && (
             <p className="px-3 pt-3 text-xs text-gray-500 dark:text-gray-400">
-              Upload and confirm your resume to unlock your dashboard, job matcher and profile tools.
+              Upload your resume or add your LinkedIn to unlock your dashboard and profile tools.
             </p>
           )}
         </nav>

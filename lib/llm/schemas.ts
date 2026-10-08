@@ -107,6 +107,7 @@ export const CandidateExtractionSchema = z.object({
   ),
   achievements: z.array(z.string()),
   activeBacklogs: z.number().int().nullable(),
+  feedback: z.array(z.string()).describe("Actionable critiques and improvement suggestions for the resume and portfolio").optional(),
 });
 
 export type CandidateExtraction = z.infer<typeof CandidateExtractionSchema>;

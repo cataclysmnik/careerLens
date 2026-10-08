@@ -1,6 +1,6 @@
 // Shared between client and server: platform metadata and handle parsing.
 
-export const CODING_PLATFORMS = ['leetcode', 'codeforces', 'codechef', 'hackerrank', 'gfg'] as const;
+export const CODING_PLATFORMS = ['leetcode', 'codeforces', 'codechef', 'hackerrank', 'gfg', 'kaggle'] as const;
 export type CodingPlatform = (typeof CODING_PLATFORMS)[number];
 
 export type CodingHandles = Partial<Record<CodingPlatform, string>>;
@@ -12,6 +12,7 @@ export const HANDLE_FIELD = {
   codechef: 'codechefUsername',
   hackerrank: 'hackerrankUsername',
   gfg: 'gfgUsername',
+  kaggle: 'kaggleUsername',
 } as const satisfies Record<CodingPlatform, string>;
 
 export const PLATFORM_INFO: Record<CodingPlatform, { label: string; host: string; profileUrl: (h: string) => string }> = {
@@ -20,6 +21,7 @@ export const PLATFORM_INFO: Record<CodingPlatform, { label: string; host: string
   codechef: { label: 'CodeChef', host: 'codechef.com', profileUrl: (h) => `https://www.codechef.com/users/${h}` },
   hackerrank: { label: 'HackerRank', host: 'hackerrank.com', profileUrl: (h) => `https://www.hackerrank.com/profile/${h}` },
   gfg: { label: 'GeeksforGeeks', host: 'geeksforgeeks.org', profileUrl: (h) => `https://www.geeksforgeeks.org/user/${h}/` },
+  kaggle: { label: 'Kaggle', host: 'kaggle.com', profileUrl: (h) => `https://www.kaggle.com/${h}` },
 };
 
 const HANDLE_RE = /^[A-Za-z0-9_.-]{1,40}$/;
@@ -32,6 +34,7 @@ const PROFILE_PATH_PREFIXES: Record<CodingPlatform, string[]> = {
   codechef: ['users'],
   hackerrank: ['profile', ''],
   gfg: ['user', 'profile'],
+  kaggle: [''],
 };
 
 const RESERVED_SEGMENTS = new Set([

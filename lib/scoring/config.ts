@@ -5,7 +5,7 @@
 // Bump SCORING_VERSION whenever any value in this file changes — stored scores
 // carry the version they were produced with, so old results stay reproducible.
 
-export const SCORING_VERSION = 'v1.3.1';
+export const SCORING_VERSION = 'v1.3.2';
 
 /** A piecewise-linear lookup: [rawValue, normalizedScore] pairs, ascending by rawValue. */
 export type PiecewiseTable = readonly (readonly [number, number])[];
@@ -231,12 +231,12 @@ export type ReadinessDimensionKey =
 // separate metrics; coding results also prove the DSA and language skills that
 // feed Technical Competency and Role Alignment.
 export const READINESS_WEIGHTS: Record<ReadinessDimensionKey, number> = {
-  technical: 0.30,
-  project: 0.20,
-  roleAlignment: 0.20,
-  experience: 0.10,
-  interview: 0.10,
-  consistency: 0.10,
+  "technical": 0.3,
+  "project": 0.2,
+  "roleAlignment": 0.2,
+  "experience": 0.1,
+  "interview": 0.1,
+  "consistency": 0.1
 };
 
 export const READINESS_DIMENSION_LABEL: Record<ReadinessDimensionKey, string> = {

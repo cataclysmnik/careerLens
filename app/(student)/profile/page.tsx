@@ -13,6 +13,7 @@ import { ROLE_BADGE_CLASS, ROLE_LABEL } from '@/lib/roles';
 import { UserAvatar } from '@/components/layout/UserAvatar';
 import { profileChecklist, profileCompleteness } from '@/lib/profileCompleteness';
 import { CODING_PLATFORMS, HANDLE_FIELD, PLATFORM_INFO } from '@/lib/coding/handles';
+import { ROLE_CATALOG } from '@/lib/scoring/roles-catalog';
 
 const EXPERIENCE_LEVELS = [
   'Student / Fresher',
@@ -40,6 +41,9 @@ type FormState = {
   codechefUsername: string;
   hackerrankUsername: string;
   gfgUsername: string;
+  kaggleUsername: string;
+  branch: string;
+  registerNumber: string;
 };
 
 const numToText = (n: number | null | undefined) => (n == null ? '' : String(n));
@@ -64,6 +68,9 @@ function toForm(me: Me): FormState {
     codechefUsername: p?.codechefUsername ?? '',
     hackerrankUsername: p?.hackerrankUsername ?? '',
     gfgUsername: p?.gfgUsername ?? '',
+    kaggleUsername: p?.kaggleUsername ?? '',
+    branch: p?.branch ?? '',
+    registerNumber: p?.registerNumber ?? '',
   };
 }
 
@@ -105,6 +112,19 @@ export default function ProfilePage() {
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setSaved(false);
     setForm((f) => (f ? { ...f, [key]: e.target.value } : f));
+  };
+
+  const handleRegisterNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSaved(false);
+    const val = e.target.value.toUpperCase();
+    setForm((f) => {
+      if (!f) return f;
+      let branch = f.branch;
+      if (/^\d{2}[A-Z]{3}\d{4}$/.test(val)) {
+        branch = val.substring(2, 5);
+      }
+      return { ...f, registerNumber: val, branch };
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -291,7 +311,19 @@ export default function ProfilePage() {
                 <label htmlFor="targetRole" className={labelClass}>
                   <Target className="inline w-3.5 h-3.5 mr-1" />Target role
                 </label>
-                <input id="targetRole" value={form.targetRole} onChange={set('targetRole')} className={inputClass} placeholder="e.g. Full Stack Developer" />
+                <select id="targetRole" value={form.targetRole} onChange={set('targetRole')} className={inputClass}>
+                  <option value="">Select a target role…</option>
+                  {ROLE_CATALOG.map((role) => (
+                    <option key={role.id} value={role.title}>{role.title}</option>
+                  ))}
+                  {form.targetRole && !ROLE_CATALOG.some(r => r.title === form.targetRole) && (
+                    <option value={form.targetRole}>{form.targetRole}</option>
+                  )}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="registerNumber" className={labelClass}>Register Number</label>
+                <input id="registerNumber" value={form.registerNumber} onChange={handleRegisterNumberChange} pattern="^\d{2}[A-Za-z]{3}\d{4}$" title="Format: 2 digits, 3 letters, 4 digits (e.g., 24BRS1242)" className={inputClass} placeholder="e.g. 24BRS1242" />
               </div>
               <div>
                 <label htmlFor="experienceLevel" className={labelClass}>
@@ -318,6 +350,10 @@ export default function ProfilePage() {
                 <label htmlFor="preferredIndustries" className={labelClass}>Preferred industries</label>
                 <input id="preferredIndustries" value={form.preferredIndustries} onChange={set('preferredIndustries')} className={inputClass} placeholder="Fintech, SaaS, EdTech" />
                 <p className="mt-1 text-xs text-gray-500">Comma-separated.</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="branch" className={labelClass}>Branch / Department</label>
+                <input id="branch" value={form.branch} readOnly className={`${inputClass} bg-gray-100 dark:bg-zinc-800/50 cursor-not-allowed`} placeholder="Auto-filled from Register Number" />
               </div>
             </div>
 

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, ShieldCheck, Bell, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldCheck, Bell, ClipboardList, Settings2 } from 'lucide-react';
 import { SidebarUserCard } from './SidebarUserCard';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { name: 'Job Listings', href: '/placement/jobs', icon: ClipboardList },
   { name: 'Approvals', href: '/placement/approvals', icon: ShieldCheck },
   { name: 'Notifications', href: '/placement/notifications', icon: Bell },
+  { name: 'Settings', href: '/placement/settings', icon: Settings2 },
 ];
 
 export function PlacementSidebar({ children }: { children: React.ReactNode }) {

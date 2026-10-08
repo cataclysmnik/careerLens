@@ -19,7 +19,7 @@ export async function GET() {
         id: true,
         name: true,
         email: true,
-        profile: { select: { targetRole: true } },
+        profile: { select: { targetRole: true, branch: true } },
         evidence: { select: { evidence: true, scoring: true, updatedAt: true } },
       },
     }),
@@ -32,7 +32,7 @@ export async function GET() {
       // Stale reports are re-scored in memory (the students endpoint saves them).
       const scoring = currentScoring(s.evidence!.evidence, s.evidence!.scoring, s.profile?.targetRole ?? null).scoring as unknown as ScoringResult;
       const evidence = s.evidence!.evidence as unknown as UnifiedEvidence;
-      return { id: s.id, name: s.name, email: s.email, scoring, evidence, updatedAt: s.evidence!.updatedAt };
+      return { id: s.id, name: s.name, email: s.email, branch: s.profile?.branch, scoring, evidence, updatedAt: s.evidence!.updatedAt };
     });
   const n = analyzed.length;
   const pct = (count: number) => (n > 0 ? Math.round((count / n) * 100) : 0);
@@ -73,6 +73,27 @@ export async function GET() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
 
+  const branchData = new Map<string, { totalScore: number; count: number; gaps: Map<string, number> }>();
+  analyzed.forEach((a) => {
+    const branch = a.branch || "Not set";
+    if (!branchData.has(branch)) branchData.set(branch, { totalScore: 0, count: 0, gaps: new Map() });
+    const b = branchData.get(branch)!;
+    b.totalScore += a.scoring.overallScore;
+    b.count++;
+    a.scoring.gaps.forEach((g) => b.gaps.set(g.title, (b.gaps.get(g.title) ?? 0) + 1));
+  });
+
+  const branchInsights = Array.from(branchData, ([branch, d]) => {
+    const topGap = Array.from(d.gaps.entries()).sort((a, b) => b[1] - a[1])[0];
+    return {
+      branch,
+      students: d.count,
+      avgScore: Math.round(d.totalScore / d.count),
+      commonGap: topGap ? topGap[0] : null,
+      gapPct: topGap ? Math.round((topGap[1] / d.count) * 100) : 0,
+    };
+  }).sort((a, b) => b.students - a.students);
+
   const brief = (a: (typeof analyzed)[number]) => ({
     id: a.id,
     name: a.name,
@@ -95,6 +116,7 @@ export async function GET() {
       pctWithPortfolio: pct(analyzed.filter((a) => a.evidence.hasPortfolio).length),
       topGaps,
       targetRoles,
+      branchInsights,
       topStudents: byScore.slice(0, 5).map(brief),
       needsAttention: byScore
         .filter((a) => readinessTier(a.scoring.overallScore) === "NEEDS_SUPPORT")
